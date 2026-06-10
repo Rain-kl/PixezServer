@@ -160,9 +160,12 @@ func GetSystemStatus(c *gin.Context) {
 	numGoroutine := runtime.NumGoroutine()
 
 	var lastGCTime string
-	if m.LastGC > 0 {
+	switch {
+	case m.LastGC > 0 && m.LastGC <= math.MaxInt64:
 		lastGCTime = formatDuration(time.Since(time.Unix(0, int64(m.LastGC))))
-	} else {
+	case m.LastGC > 0:
+		lastGCTime = "未知"
+	default:
 		lastGCTime = "无"
 	}
 
@@ -299,7 +302,7 @@ func exportSQLite(c *gin.Context) {
 		path = "./data/wavelet.db"
 	}
 
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path is loaded from server startup configuration, not user input
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, util.Err("无法打开数据库文件: "+err.Error()))
 		return
@@ -342,7 +345,7 @@ func exportPostgres(c *gin.Context) {
 		dbCfg.Database,
 	}
 
-	cmd := exec.CommandContext(c.Request.Context(), pgDumpPath, args...)
+	cmd := exec.CommandContext(c.Request.Context(), pgDumpPath, args...) //nolint:gosec // pgDumpPath is a looked up command path, args are from database configuration
 	if dbCfg.Password != "" {
 		cmd.Env = append(os.Environ(), "PGPASSWORD="+dbCfg.Password)
 	} else {

@@ -512,7 +512,7 @@ func tryInstantUpload(ctx context.Context, c *gin.Context, currUser *model.User,
 
 	if err := db.DB(ctx).Create(&newUpload).Error; err != nil {
 		c.JSON(http.StatusOK, util.Err(ErrSaveUploadRecordFailed))
-		return true, nil
+		return true, err
 	}
 
 	logger.InfoF(ctx, "文件触发秒传成功! ID: %d, Path: %s", id, existing.FilePath)

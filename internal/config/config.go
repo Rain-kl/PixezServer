@@ -31,9 +31,9 @@ import (
 
 // 默认队列优先级
 const (
-	webhookQueuePriority    = 10
-	whitelistQueuePriority  = 5
-	defaultQueuePriority    = 3
+	webhookQueuePriority   = 10
+	whitelistQueuePriority = 5
+	defaultQueuePriority   = 3
 )
 
 // Config 全局配置单例，初始化后不可变
@@ -83,7 +83,7 @@ func init() {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			// 文件存在但读取/解析失败
-			if _, statErr := os.Stat(configPath); statErr == nil {
+			if _, statErr := os.Stat(configPath); statErr == nil { //nolint:gosec // configPath is loaded from CONFIG_PATH environment variable
 				log.Fatalf("[Config] read config failed: %v\n", err)
 			}
 		}

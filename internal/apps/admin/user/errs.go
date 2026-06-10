@@ -27,6 +27,6 @@ const (
 	deleteUserFailed = "删除用户失败"
 	usernameExists   = "用户名已存在"
 	usernameRequired = "用户名不能为空"
-	passwordTooShort = "密码长度不能少于 8 位"
+	passwordTooShort = "密码长度不能少于 8 位" //nolint:gosec // false positive: this is an error message, not hardcoded credentials
 	createUserFailed = "创建用户失败"
 )

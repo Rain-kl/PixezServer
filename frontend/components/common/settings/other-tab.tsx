@@ -4,6 +4,7 @@ import {useMemo} from "react"
 import {useMutation, useQueryClient} from "@tanstack/react-query"
 import {
   CreditCard,
+  Database,
   FileText,
   FolderOpen,
   Home,
@@ -37,6 +38,7 @@ const MENU_GROUPS = [
       { path: "/admin/files", label: "文件管理", description: "查看用户上传文件并清理多余文件", icon: FolderOpen },
       { path: "/admin/tasks", label: "任务管理", description: "查看和调度系统异步及定时任务", icon: Layers },
       { path: "/admin/system", label: "系统配置", description: "管理和维护系统基础键值对配置", icon: ShieldCheck },
+      { path: "/admin/database", label: "数据管理", description: "监控物理数据库状态、分页浏览表数据及交互式 SQL 查询", icon: Database },
       { path: "/admin/logs", label: "系统日志", description: "查看异步任务执行日志和系统运行情况", icon: Terminal },
       { path: "/admin/settings", label: "系统设置", description: "配置安全验证、邮箱服务及目录显示", icon: Settings, readOnly: true },
     ]

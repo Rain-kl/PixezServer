@@ -69,7 +69,7 @@ func Request(ctx context.Context, method, url string, body io.Reader, headers, c
 	}
 
 	for key, value := range cookies {
-		req.AddCookie(&http.Cookie{Name: key, Value: value})
+		req.AddCookie(&http.Cookie{Name: key, Value: value}) //nolint:gosec // client-side cookies do not require server attributes (Secure/HttpOnly)
 	}
 
 	for key, value := range headers {

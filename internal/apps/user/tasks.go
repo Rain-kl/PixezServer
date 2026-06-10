@@ -114,7 +114,7 @@ func (h *SendEmailHandler) Execute(ctx context.Context, payload []byte) (*task.T
 	task.AppendLog(ctx, "连接 SMTP 服务器: %s:%d, 用户名: %s", smtpHost, smtpPort, smtpUsername)
 
 	// 调用 SendMailHTML 执行邮件发送，这里会有 5s 拨号超时和 10s 读写限制
-	err = mail.SendMailHTML(cfg, req.To, req.Subject, req.Body)
+	err = mail.SendMailHTML(ctx, cfg, req.To, req.Subject, req.Body)
 	if err != nil {
 		task.AppendLog(ctx, "邮件发送失败: %v", err)
 		return nil, fmt.Errorf(errSendMailFailed, err)

@@ -127,7 +127,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	if isEmailLoginVerificationEnabled() {
+	if isEmailLoginVerificationEnabled(ctx) {
 		if emailErr := handleLoginEmailVerification(ctx, c, &req, &user); emailErr != nil {
 			return
 		}
@@ -153,7 +153,7 @@ func Login(c *gin.Context) {
 	}
 
 	// 检查是否有未完成 of OAuth/OIDC 绑定
-	completePendingOAuthBinding(session, &user)
+	completePendingOAuthBinding(ctx, session, &user)
 
 	c.JSON(http.StatusOK, util.OK(oauth.BuildBasicUserInfo(&user, needChangePassword)))
 }

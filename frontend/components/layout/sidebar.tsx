@@ -47,6 +47,7 @@ import {
   ArrowUpRight,
   ChevronDown,
   CreditCard,
+  Database,
   FileQuestionMark,
   FileText,
   FolderOpen,
@@ -73,9 +74,9 @@ const data = {
     { title: "文件管理", url: "/admin/files", icon: FolderOpen },
     { title: "任务管理", url: "/admin/tasks", icon: Layers },
     { title: "系统配置", url: "/admin/system", icon: ShieldCheck },
+    { title: "数据管理", url: "/admin/database", icon: Database },
     { title: "系统日志", url: "/admin/logs", icon: Terminal },
     { title: "系统设置", url: "/admin/settings", icon: Settings },
-
   ],
   document: [
     { title: "组件库", url: "/components", icon: Palette },

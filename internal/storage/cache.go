@@ -114,7 +114,7 @@ func getLocalCacheFile(ctx context.Context, localPath, metaPath string) (*Object
 	defer span.End()
 
 	// 尝试打开本地缓存文件
-	file, err := os.Open(localPath)
+	file, err := os.Open(localPath) //nolint:gosec // localPath is internally managed cache path
 	if err == nil {
 		defer func() { _ = file.Close() }()
 	}
@@ -131,7 +131,7 @@ func getLocalCacheFile(ctx context.Context, localPath, metaPath string) (*Object
 	}
 
 	// 读取元信息
-	metaData, err := os.ReadFile(metaPath)
+	metaData, err := os.ReadFile(metaPath) //nolint:gosec // metaPath is internally managed cache path
 
 	// 文件不存在
 	if err != nil && os.IsNotExist(err) {

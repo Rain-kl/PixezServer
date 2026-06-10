@@ -16,8 +16,8 @@ build-embedded:
 	go build -tags embed_frontend -o bin/wavelet main.go
 
 code-check:
-	cd frontend && pnpm tsc --noEmit --jsx preserve && npx eslint . --max-warnings 0
 	golangci-lint run
+	cd frontend && pnpm tsc --noEmit --jsx preserve && npx eslint . --max-warnings 0
 
 build-test:
 	@echo "==> Running frontend and backend build tests in parallel..."

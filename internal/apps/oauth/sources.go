@@ -482,7 +482,7 @@ func handleCallbackBind(ctx context.Context, c *gin.Context, source *model.AuthS
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return
 	}
-	if err := model.BindExternalAccount(&model.ExternalAccount{
+	if err := model.BindExternalAccount(ctx, &model.ExternalAccount{
 		AuthSourceID:     source.ID,
 		UserID:           user.ID,
 		ExternalID:       userInfo.Sub,
@@ -501,7 +501,7 @@ func handleCallbackBind(ctx context.Context, c *gin.Context, source *model.AuthS
 func handleCallbackLogin(ctx context.Context, c *gin.Context, source *model.AuthSource, userInfo *model.OAuthUserInfo) {
 	var user model.User
 
-	account, err := model.FindExternalAccount(source.ID, userInfo.Sub)
+	account, err := model.FindExternalAccount(ctx, source.ID, userInfo.Sub)
 	switch {
 	case err == nil:
 		if err := db.DB(ctx).First(&user, "id = ?", account.UserID).Error; err != nil {
@@ -562,7 +562,7 @@ func handleCallbackRegister(ctx context.Context, c *gin.Context, source *model.A
 		c.JSON(http.StatusInternalServerError, util.Err(err.Error()))
 		return model.User{}, false
 	}
-	if err := model.BindExternalAccount(&model.ExternalAccount{
+	if err := model.BindExternalAccount(ctx, &model.ExternalAccount{
 		AuthSourceID:     source.ID,
 		UserID:           user.ID,
 		ExternalID:       userInfo.Sub,

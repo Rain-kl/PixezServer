@@ -41,16 +41,16 @@ type sendEmailCodeRequest struct {
 	Scene string `json:"scene" binding:"required"`
 }
 
-func isEmailLoginVerificationEnabled() bool {
-	enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyEmailLoginVerificationEnabled)
+func isEmailLoginVerificationEnabled(ctx context.Context) bool {
+	enabled, err := model.GetBoolByKey(ctx, model.ConfigKeyEmailLoginVerificationEnabled)
 	if err != nil {
 		return false
 	}
 	return enabled
 }
 
-func isEmailRegisterVerificationEnabled() bool {
-	enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyEmailRegisterVerificationEnabled)
+func isEmailRegisterVerificationEnabled(ctx context.Context) bool {
+	enabled, err := model.GetBoolByKey(ctx, model.ConfigKeyEmailRegisterVerificationEnabled)
 	if err != nil {
 		return false
 	}
@@ -228,7 +228,7 @@ func SendEmailCode(c *gin.Context) {
 }
 
 func validateRegisterEmailVerification(ctx context.Context, req *registerRequest) error {
-	if !isEmailRegisterVerificationEnabled() {
+	if !isEmailRegisterVerificationEnabled(ctx) {
 		return nil
 	}
 	if req.Email == "" || req.Code == "" {
@@ -241,7 +241,7 @@ func validateRegisterEmailVerification(ctx context.Context, req *registerRequest
 }
 
 // completePendingOAuthBinding 完成登录后的 OAuth 待绑定绑定流程
-func completePendingOAuthBinding(session sessions.Session, user *model.User) {
+func completePendingOAuthBinding(ctx context.Context, session sessions.Session, user *model.User) {
 	pendingSourceID := session.Get(oauth.PendingOAuthSourceIDKey)
 	pendingExternalID := session.Get(oauth.PendingOAuthExternalIDKey)
 	pendingExternalUsername := session.Get(oauth.PendingOAuthExternalUsernameKey)
@@ -256,16 +256,20 @@ func completePendingOAuthBinding(session sessions.Session, user *model.User) {
 	case uint64:
 		sourceID = v
 	case int:
-		sourceID = uint64(v)
+		if v >= 0 {
+			sourceID = uint64(v)
+		}
 	case float64:
-		sourceID = uint64(v)
+		if v >= 0 && v <= 18446744073709551615.0 {
+			sourceID = uint64(v)
+		}
 	}
 	externalID, _ := pendingExternalID.(string)
 	externalUsername, _ := pendingExternalUsername.(string)
 	email, _ := pendingEmail.(string)
 
 	if sourceID != 0 && externalID != "" {
-		_ = model.BindExternalAccount(&model.ExternalAccount{
+		_ = model.BindExternalAccount(ctx, &model.ExternalAccount{
 			AuthSourceID:     sourceID,
 			UserID:           user.ID,
 			ExternalID:       externalID,

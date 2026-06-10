@@ -25,6 +25,7 @@ import {AdminService} from './admin';
 import {UserService} from './user';
 import {ConfigService} from './config';
 import {UploadService} from './upload';
+import {DbManageService} from './db-manage';
 
 /**
  * 服务对象
@@ -44,6 +45,8 @@ const services = {
   config: ConfigService,
   /** 上传服务 */
   upload: UploadService,
+  /** 数据库管理服务 */
+  dbManage: DbManageService,
 } as const;
 
 export default services;
@@ -116,3 +119,7 @@ export type { AccessToken, CreateTokenResponse } from './user';
 // 上传服务
 export { UploadService } from './upload';
 export type { UploadImageResponse } from './upload';
+
+// 数据库管理服务
+export { DbManageService } from './db-manage';
+export type { DBOverview, TableDataResponse, ExecuteSQLResponse } from './db-manage';

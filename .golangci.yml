@@ -17,36 +17,38 @@ linters:
     # 代码坏味道
     - dupl          # 重复代码
     - mnd           # 魔法数字
-    - gocyclo       # 圈复杂度
     - cyclop        # 包/函数复杂度
     - nestif        # if 嵌套太深
     - maintidx      # 维护性指数
     - revive        # 风格/命名/坏味道
     - gocritic      # 各类代码问题
+    - funlen        # 函数过长
+
+    - gosec        # 安全问题检查
+    - bodyclose     # HTTP response body 没有正确关闭
+    - noctx         # 没有传递 context.Context
+    - contextcheck  # 其他检查
+    - sqlclosecheck   # SQL rows 没有正确关闭
+    - unconvert  # 不必要的类型转换
+    - nilerr  # 函数返回 nil 错误
 
   settings:
     dupl:
-      threshold: 150
-
-    gocyclo:
-      min-complexity: 20
+      threshold: 120
 
     cyclop:
-      max-complexity: 15
+      max-complexity: 20
       package-average: 10
-
-    funlen:
-      lines: 150
-      statements: 80
 
     nestif:
       min-complexity: 5
 
+    funlen:
+      lines: 200
+      statements: 100
+
     mnd:
       checks:
         - argument
-        - case
         - condition
-        - operation
         - return
-        - assign

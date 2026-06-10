@@ -288,7 +288,7 @@ func TestSMTP(c *gin.Context) {
 <p>If you received this message, your SMTP configuration is correct and mail sending is working properly.</p>
 <p>Sent from Wavelet.</p>`
 
-	logs, err := mail.SendMailWithLog(cfg, req.To, subject, body)
+	logs, err := mail.SendMailWithLog(c.Request.Context(), cfg, req.To, subject, body)
 	resp := TestSMTPResponse{
 		Success: err == nil,
 		Log:     logs,

@@ -20,7 +20,7 @@ package oauth
 // OAuth 认证相关错误消息
 const (
 	InvalidState                    = "非法登录请求"
-	IDTokenVerifyFailed             = "ID Token 验证失败"
+	IDTokenVerifyFailed             = "ID Token 验证失败" //nolint:gosec // false positive: this is an error message, not hardcoded credentials
 	IDTokenVerifyFailedFormat       = "%s: %w"
 	NonceMismatch                   = "nonce 不匹配，可能存在重放攻击"
 	NoActiveAuthSource              = "未配置可用认证源"

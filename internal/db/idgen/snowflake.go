@@ -44,5 +44,9 @@ func init() {
 
 // NextUint64ID 生成下一个分布式唯一 ID
 func NextUint64ID() uint64 {
-	return uint64(node.Generate().Int64())
+	val := node.Generate().Int64()
+	if val < 0 {
+		return 0
+	}
+	return uint64(val)
 }

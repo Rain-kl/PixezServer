@@ -34,7 +34,7 @@ const (
 	errAuthSourceNameInvalid                = "认证源名称只能包含字母、数字、短横线或下划线，且必须以字母或数字开头"
 	errAuthSourceTypeUnsupported            = "认证源类型仅支持 oidc"
 	errAuthSourceDiscoveryURLRequired       = "OIDC 认证源必须配置 Discovery URL"
-	errAuthSourceClientCredentialsRequired  = "启用认证源前必须配置 Client ID 和 Client Secret"
+	errAuthSourceClientCredentialsRequired  = "启用认证源前必须配置 Client ID 和 Client Secret" //nolint:gosec // false positive: this is an error message, not hardcoded credentials
 	errAuthSourceIDRequired                 = "认证源 ID 不能为空"
 	errExternalAccountBindingIncomplete     = "外部账号绑定信息不完整"
 	errExternalAccountAlreadyBoundToAnother = "该外部账号已绑定到其他用户"

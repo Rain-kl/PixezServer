@@ -31,15 +31,15 @@ import (
 )
 
 const (
-	managerDefaultChallengeCount      = 1
-	managerDefaultChallengeSize       = 32
-	defaultChallengeDifficulty = 4
-	defaultChallengeTTL        = 10 * time.Minute
-	defaultTokenTTL            = 20 * time.Minute
-	redeemTokenIDLength        = 8  // 兑换 Token ID 字节长度
-	redeemVerTokenLength       = 15 // 兑换验证 Token 字节长度
-	tokenPartsCount            = 2  // 兑换 Token 由两部分组成
-	valuePartsCount            = 2  // 存储值由 scope 和过期时间组成
+	managerDefaultChallengeCount = 1
+	managerDefaultChallengeSize  = 32
+	defaultChallengeDifficulty   = 4
+	defaultChallengeTTL          = 10 * time.Minute
+	defaultTokenTTL              = 20 * time.Minute
+	redeemTokenIDLength          = 8  // 兑换 Token ID 字节长度
+	redeemVerTokenLength         = 15 // 兑换验证 Token 字节长度
+	tokenPartsCount              = 2  // 兑换 Token 由两部分组成
+	valuePartsCount              = 2  // 存储值由 scope 和过期时间组成
 )
 
 // Config holds settings for the CAPTCHA manager
@@ -107,7 +107,7 @@ func (m *Manager) Redeem(ctx context.Context, token string, solutions []int, sco
 	// TTL is set to the challenge's remaining lifetime so the slot auto-expires.
 	payload, err := VerifyChallengeSolutions(token, solutions, m.conf.Secret, scope)
 	if err != nil {
-		return &RedeemResponse{Success: false, Error: err.Error()}, nil
+		return &RedeemResponse{Success: false, Error: err.Error()}, nil //nolint:nilerr // expected behavior: validation error is returned as response, not system error
 	}
 
 	// Calculate remaining lifetime of the challenge JWT for the nonce TTL.
@@ -187,7 +187,7 @@ func (m *Manager) VerifyToken(ctx context.Context, token string, expectedScope s
 
 	expNano, err := strconv.ParseInt(valParts[0], 10, 64)
 	if err != nil {
-		return false, nil
+		return false, nil //nolint:nilerr // expected behavior: invalid format is treated as validation failure, not system error
 	}
 	tokenScope := valParts[1]
 

@@ -24,6 +24,6 @@ const (
 	errSMTPMailCommandFailed    = "smtp mail command failed: %w"
 	errSMTPRcptCommandFailed    = "smtp rcpt command failed: %w"
 	errSMTPDataCommandFailed    = "smtp data command failed: %w"
-	errSMTPWritingBodyFailed    = "smtp writing body failed: %w"
+	errSMTPWritingBodyFailed    = "smtp writing body failed: %w" //nolint:gosec // false positive: this is an error message, not hardcoded credentials
 	errSendMailFailed           = "send mail failed: %w"
 )

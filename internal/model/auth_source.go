@@ -234,16 +234,16 @@ func DeleteAuthSource(id uint64) error {
 }
 
 // FindExternalAccount 查找外部帐号绑定记录
-func FindExternalAccount(sourceID uint64, externalID string) (*ExternalAccount, error) {
+func FindExternalAccount(ctx context.Context, sourceID uint64, externalID string) (*ExternalAccount, error) {
 	var account ExternalAccount
-	if err := db.DB(context.Background()).Where("auth_source_id = ? AND external_id = ?", sourceID, externalID).First(&account).Error; err != nil {
+	if err := db.DB(ctx).Where("auth_source_id = ? AND external_id = ?", sourceID, externalID).First(&account).Error; err != nil {
 		return nil, err
 	}
 	return &account, nil
 }
 
 // BindExternalAccount 绑定外部帐号（已存在时更新用户名和邮箱）
-func BindExternalAccount(account *ExternalAccount) error {
+func BindExternalAccount(ctx context.Context, account *ExternalAccount) error {
 	if account.UserID == 0 || strings.TrimSpace(account.ExternalID) == "" {
 		return errors.New(errExternalAccountBindingIncomplete)
 	}
@@ -251,7 +251,7 @@ func BindExternalAccount(account *ExternalAccount) error {
 	account.ExternalUsername = strings.TrimSpace(account.ExternalUsername)
 	account.Email = strings.TrimSpace(account.Email)
 
-	return db.DB(context.Background()).Transaction(func(tx *gorm.DB) error {
+	return db.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		var current ExternalAccount
 		err := tx.Where("auth_source_id = ? AND external_id = ?", account.AuthSourceID, account.ExternalID).First(&current).Error
 		if err == nil {

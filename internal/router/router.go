@@ -30,6 +30,7 @@ import (
 
 	"github.com/Rain-kl/Wavelet/internal/apps/admin"
 	admin_auth_source "github.com/Rain-kl/Wavelet/internal/apps/admin/auth_source"
+	admin_db_manage "github.com/Rain-kl/Wavelet/internal/apps/admin/db_manage"
 	admin_logs "github.com/Rain-kl/Wavelet/internal/apps/admin/logs"
 	admin_status "github.com/Rain-kl/Wavelet/internal/apps/admin/status"
 	admin_task "github.com/Rain-kl/Wavelet/internal/apps/admin/task"
@@ -111,6 +112,40 @@ func Serve() {
 	// 补充中间件
 	r.Use(otelgin.Middleware(config.Config.App.AppName), loggerMiddleware(), risk_control.RiskControlMiddleware())
 
+	registerRoutes(r)
+
+	srv := &http.Server{
+		Addr:              config.Config.App.Addr,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		log.Printf("[API] server starting on %s\n", config.Config.App.Addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("[API] server failed: %v\n", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Config.App.GracefulShutdownTimeout)*time.Second)
+
+	otel_trace.Shutdown(shutdownCtx)
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("[API] server forced to shutdown: %v\n", err)
+		cancel()
+		os.Exit(1)
+	}
+	cancel()
+
+	log.Println("[API] server exited")
+}
+
+func registerRoutes(r *gin.Engine) {
 	// Serve files by ID
 	r.GET("/f/:id", upload.ServeFileByID)
 
@@ -231,6 +266,12 @@ func Serve() {
 				adminRouter.GET("/db-info", admin_status.GetDatabaseInfo)
 				adminRouter.GET("/db-export", admin_status.ExportDatabase)
 
+				// Database management
+				adminRouter.GET("/db-manage/overview", admin_db_manage.GetDBOverview)
+				adminRouter.GET("/db-manage/tables", admin_db_manage.ListDBTables)
+				adminRouter.GET("/db-manage/table-data", admin_db_manage.GetDBTableData)
+				adminRouter.POST("/db-manage/query", admin_db_manage.ExecuteSQL)
+
 				// System logs
 				adminRouter.GET("/logs", admin_logs.GetLogs)
 				adminRouter.GET("/logs/access", admin_logs.GetAccessLogs)
@@ -296,33 +337,4 @@ func Serve() {
 
 	// 注册前端静态路由（当启用 embed_frontend 编译标签时）
 	registerFrontend(r)
-
-	srv := &http.Server{
-		Addr:    config.Config.App.Addr,
-		Handler: r,
-	}
-
-	go func() {
-		log.Printf("[API] server starting on %s\n", config.Config.App.Addr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("[API] server failed: %v\n", err)
-		}
-	}()
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Config.App.GracefulShutdownTimeout)*time.Second)
-
-	otel_trace.Shutdown(shutdownCtx)
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("[API] server forced to shutdown: %v\n", err)
-		cancel()
-		os.Exit(1)
-	}
-	cancel()
-
-	log.Println("[API] server exited")
 }
