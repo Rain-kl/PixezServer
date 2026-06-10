@@ -24,6 +24,11 @@ const nextConfig: NextConfig = {
         {
           source: '/api/:path*',
           destination: `${ backendUrl }/api/:path*`,
+        },
+        // Mirror API 接口代理到后端
+        {
+          source: '/mirror/:path*',
+          destination: `${ backendUrl }/mirror/:path*`,
         }
       ];
     },
