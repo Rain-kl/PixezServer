@@ -141,8 +141,8 @@ func RetryTask(ctx context.Context, id uint64) (string, error) {
 		return "", fmt.Errorf(errTaskExecutionNotFound, err)
 	}
 
-	if execution.Status != model.TaskExecutionStatusFailed {
-		return "", fmt.Errorf(errRetryOnlyFailedTask, execution.Status)
+	if execution.Status == model.TaskExecutionStatusPending || execution.Status == model.TaskExecutionStatusRunning {
+		return "", fmt.Errorf(errRetryOnlyFinishedTask, execution.Status)
 	}
 
 	if !execution.Retryable {
@@ -302,6 +302,7 @@ func completeTaskExecution(ctx context.Context, execution *model.TaskExecution, 
 		span.RecordError(execErr)
 	} else {
 		execution.Status = model.TaskExecutionStatusSucceeded
+		execution.ErrorMessage = "" // 清除历史重试失败遗留的错误信息
 		if result != nil {
 			execution.Result = result.Message
 			if result.Detail != "" {
