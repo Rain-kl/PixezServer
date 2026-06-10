@@ -161,7 +161,7 @@ export function MirrorDetailDrawer({
                 </Button>
                 {mirror?.task_id && (
                   <Button variant="outline" size="sm" asChild>
-                    <Link href="/admin/tasks/executions">
+                    <Link href="/admin/tasks?tab=executions">
                       <ExternalLink />
                       任务日志
                     </Link>
