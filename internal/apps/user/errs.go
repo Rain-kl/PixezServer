@@ -31,11 +31,12 @@ const (
 	errRenderEmailTemplateFailed = "渲染验证邮件模板失败：%w"
 	errGenerateEmailCodeFailed   = "生成验证码失败，请重试"
 	errDispatchEmailTaskFailed   = "投递验证邮件发送任务失败，请重试"
-	errTokenNameRequired         = "令牌名称不能为空"        //nolint:gosec // false positive: this is an error message, not hardcoded credentials
-	errAccessTokenLimitReached   = "已达到访问令牌最大创建数量限制" //nolint:gosec // false positive: this is an error message, not hardcoded credentials
-	errGenerateTokenFailed       = "生成令牌失败"          //nolint:gosec // false positive: this is an error message, not hardcoded credentials
-	errInvalidTokenID            = "无效的令牌ID"         //nolint:gosec // false positive: this is an error message, not hardcoded credentials
-	errTokenNotFoundOrForbidden  = "令牌不存在或无权操作"      //nolint:gosec // false positive: this is an error message, not hardcoded credentials
+	errTokenNameRequired         = "令牌名称不能为空"            //nolint:gosec // false positive: this is an error message, not hardcoded credentials
+	errAccessTokenLimitReached   = "已达到访问令牌最大创建数量限制"     //nolint:gosec // false positive: this is an error message, not hardcoded credentials
+	errGenerateTokenFailed       = "生成令牌失败"              //nolint:gosec // false positive: this is an error message, not hardcoded credentials
+	errInvalidTokenID            = "无效的令牌ID"             //nolint:gosec // false positive: this is an error message, not hardcoded credentials
+	errTokenNotFoundOrForbidden  = "令牌不存在或无权操作"          //nolint:gosec // false positive: this is an error message, not hardcoded credentials
+	errAdminTokenRequiresAdmin   = "只有管理员才能创建具有管理员权限的令牌" //nolint:gosec // false positive: this is an error message, not hardcoded credentials
 	errTaskPayloadRequired       = "任务参数不能为空"
 	errInvalidJSONFormat         = "无效的 JSON 格式: %w"
 	errEmailTaskFieldsRequired   = "to、subject、body 不能为空"

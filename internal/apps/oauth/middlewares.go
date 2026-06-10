@@ -45,6 +45,8 @@ func LoginRequired() gin.HandlerFunc {
 
 		var user model.User
 		var authenticated bool
+		var tokenAuth bool
+		var tokenAdmin bool
 
 		if tokenStr != "" {
 			tokenHash := model.HashToken(tokenStr)
@@ -52,6 +54,8 @@ func LoginRequired() gin.HandlerFunc {
 			if err := db.DB(ctx).Where("token_hash = ?", tokenHash).First(&tokenRecord).Error; err == nil {
 				if err := db.DB(ctx).Where("id = ? AND is_active = ?", tokenRecord.UserID, true).First(&user).Error; err == nil {
 					authenticated = true
+					tokenAuth = true
+					tokenAdmin = tokenRecord.IsAdmin
 					// update token last used time
 					now := time.Now()
 					db.DB(ctx).Model(&tokenRecord).Update("last_used_at", &now)
@@ -80,6 +84,8 @@ func LoginRequired() gin.HandlerFunc {
 
 		// set user info
 		util.SetToContext(c, UserObjKey, &user)
+		util.SetToContext(c, TokenAuthKey, tokenAuth)
+		util.SetToContext(c, TokenAdminKey, tokenAdmin)
 
 		// next
 		c.Next()

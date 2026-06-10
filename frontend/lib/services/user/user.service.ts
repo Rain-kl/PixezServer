@@ -5,6 +5,7 @@ export interface AccessToken {
   user_id: number;
   name: string;
   masked_token: string;
+  is_admin: boolean;
   last_used_at?: string;
   created_at: string;
   updated_at: string;
@@ -32,9 +33,10 @@ export class UserService extends BaseService {
   /**
    * 创建一个新的 AccessToken
    * @param name - 令牌名称
+   * @param isAdmin - 是否赋予管理员权限（默认 false）
    */
-  static async createAccessToken(name: string): Promise<CreateTokenResponse> {
-    return this.post<CreateTokenResponse>('/access-tokens', { name });
+  static async createAccessToken(name: string, isAdmin = false): Promise<CreateTokenResponse> {
+    return this.post<CreateTokenResponse>('/access-tokens', { name, is_admin: isAdmin });
   }
 
   /**

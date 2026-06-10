@@ -190,8 +190,9 @@ export const apiSections: PolicySection[] = [
 
         <h3 id="3-2-create-token" className="text-base md:text-lg font-semibold text-foreground mt-6 mb-2">3.2 新建访问令牌</h3>
         <p><strong>接口：</strong>POST <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">/api/v1/user/access-tokens</code></p>
-        <p><strong>参数：</strong>JSON Body <code className="bg-muted px-1.5 rounded text-xs font-mono">{`{"name": "token名称"}`}</code></p>
+        <p><strong>参数：</strong>JSON Body <code className="bg-muted px-1.5 rounded text-xs font-mono">{`{"name": "token名称", "is_admin": false}`}</code></p>
         <p><strong>说明：</strong>生成一个全新访问令牌。返回体中包含一次性明文 Token，切勿遗失。</p>
+        <p className="mt-1 text-xs text-muted-foreground"><code className="bg-muted px-1 rounded">is_admin</code>（可选，默认 <code className="bg-muted px-1 rounded">false</code>）：是否赋予令牌管理员权限，仅管理员用户可设置。非管理员令牌无法访问 <code className="bg-muted px-1 rounded">/admin/**</code> 端点。</p>
         <p className="mt-2">成功返回样例：</p>
         <CodeBlock
           code={`{
@@ -203,6 +204,7 @@ export const apiSections: PolicySection[] = [
       "user_id": 1,
       "name": "my-dev-key",
       "masked_token": "at_628d...29c9",
+      "is_admin": false,
       "last_used_at": null,
       "created_at": "2026-06-07T21:30:00+08:00"
     }

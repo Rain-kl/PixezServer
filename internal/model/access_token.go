@@ -25,6 +25,7 @@ type AccessToken struct {
 	Name        string     `json:"name" gorm:"size:128;not null"`
 	TokenHash   string     `json:"-" gorm:"size:64;uniqueIndex;not null"`
 	MaskedToken string     `json:"masked_token" gorm:"size:64;not null"`
+	IsAdmin     bool       `json:"is_admin" gorm:"default:false"`
 	LastUsedAt  *time.Time `json:"last_used_at"`
 	CreatedAt   time.Time  `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time  `json:"updated_at" gorm:"autoUpdateTime"`

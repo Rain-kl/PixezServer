@@ -18,7 +18,8 @@ import (
 )
 
 type createTokenRequest struct {
-	Name string `json:"name"`
+	Name    string `json:"name"`
+	IsAdmin bool   `json:"is_admin"`
 }
 
 type tokenResponse struct {
@@ -51,7 +52,7 @@ func ListAccessTokens(c *gin.Context) {
 
 // CreateAccessToken 创建一个新的 AccessToken
 // @Summary 创建一个新的 AccessToken
-// @Description 为当前用户新建一个 API 访问令牌，仅在此接口返回一次明文令牌值，请妥善保存。
+// @Description 为当前用户新建一个 API 访问令牌，仅在此接口返回一次明文令牌值，请妥善保存。可通过 is_admin 字段赋予令牌管理员权限（仅管理员用户可设置）。
 // @Tags user
 // @Accept json
 // @Produce json
@@ -73,6 +74,12 @@ func CreateAccessToken(c *gin.Context) {
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
 		c.JSON(http.StatusOK, util.Err(errTokenNameRequired))
+		return
+	}
+
+	// 只有管理员才能创建具有管理员权限的令牌
+	if req.IsAdmin && !currUser.IsAdmin {
+		c.JSON(http.StatusOK, util.Err(errAdminTokenRequiresAdmin))
 		return
 	}
 
@@ -108,6 +115,7 @@ func CreateAccessToken(c *gin.Context) {
 		Name:        req.Name,
 		TokenHash:   tokenHash,
 		MaskedToken: maskedToken,
+		IsAdmin:     req.IsAdmin,
 	}
 
 	if err := db.DB(ctx).Create(&tokenRecord).Error; err != nil {

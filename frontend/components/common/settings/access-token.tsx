@@ -4,12 +4,14 @@ import * as React from "react"
 import Link from "next/link"
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
 import {motion} from "motion/react"
-import {AlertTriangle, Check, Copy, Info, Key, Loader2, Plus, RefreshCw, Trash2} from "lucide-react"
+import {AlertTriangle, Check, Copy, Info, Key, Loader2, Plus, RefreshCw, Shield, Trash2} from "lucide-react"
 
 import {Button} from "@/components/ui/button"
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card"
 import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
+import {Badge} from "@/components/ui/badge"
+import {Switch} from "@/components/ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -28,13 +30,16 @@ import {
 } from "@/components/ui/breadcrumb"
 import {UserService} from "@/lib/services"
 import type {CreateTokenResponse} from "@/lib/services/user"
+import {useAuth} from "@/components/providers/auth-provider"
 import {toast} from "sonner"
 
 export function AccessTokenMain() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [viewDialogOpen, setViewDialogOpen] = React.useState(false)
   const [tokenName, setTokenName] = React.useState("")
+  const [tokenIsAdmin, setTokenIsAdmin] = React.useState(false)
   const [copiedId, setCopiedId] = React.useState<number | null>(null)
   const [newCreatedToken, setNewCreatedToken] = React.useState<CreateTokenResponse | null>(null)
 
@@ -46,10 +51,11 @@ export function AccessTokenMain() {
 
   // 创建 Token
   const createTokenMutation = useMutation({
-    mutationFn: (name: string) => UserService.createAccessToken(name),
+    mutationFn: ({ name, isAdmin }: { name: string; isAdmin: boolean }) => UserService.createAccessToken(name, isAdmin),
     onSuccess: (data) => {
       setNewCreatedToken(data)
       setTokenName("")
+      setTokenIsAdmin(false)
       setCreateDialogOpen(false)
       setViewDialogOpen(true)
       void queryClient.invalidateQueries({ queryKey: ["user", "access-tokens"] })
@@ -92,7 +98,7 @@ export function AccessTokenMain() {
       toast.error("请输入令牌名称")
       return
     }
-    createTokenMutation.mutate(tokenName.trim())
+    createTokenMutation.mutate({ name: tokenName.trim(), isAdmin: tokenIsAdmin })
   }
 
   const handleDeleteToken = (id: number, name: string) => {
@@ -200,6 +206,12 @@ export function AccessTokenMain() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-foreground">{token.name}</span>
+                      {token.is_admin && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-rose-500/40 text-rose-500 bg-rose-500/5 font-semibold">
+                          <Shield className="size-2.5 mr-0.5" />
+                          管理员
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                       <div className="font-mono bg-muted/30 px-2 py-0.5 rounded border border-border/50 w-fit select-all">
@@ -293,6 +305,25 @@ export function AccessTokenMain() {
                   className="rounded-xl border border-dashed focus:border-indigo-500 focus:ring-0 focus-visible:ring-0"
                 />
               </div>
+              {user?.is_admin && (
+                <div className="flex items-center justify-between rounded-xl border border-dashed p-3 bg-muted/5">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="token-admin" className="text-xs font-semibold flex items-center gap-1.5">
+                      <Shield className="size-3.5 text-rose-500" />
+                      管理员权限
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground leading-normal">
+                      开启后此令牌可访问 /admin/** 管理端点，默认关闭
+                    </p>
+                  </div>
+                  <Switch
+                    id="token-admin"
+                    checked={tokenIsAdmin}
+                    onCheckedChange={setTokenIsAdmin}
+                    disabled={createTokenMutation.isPending}
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter className="gap-2">
               <Button
@@ -336,9 +367,6 @@ export function AccessTokenMain() {
               <Check className="size-5 text-emerald-500 border border-emerald-500 rounded-full p-0.5" />
               令牌密钥已就绪
             </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              这是您唯一一次能够查看此访问令牌明文密钥的机会。请立即将其复制并安全地保存。
-            </DialogDescription>
           </DialogHeader>
 
           {newCreatedToken && (
@@ -369,7 +397,7 @@ export function AccessTokenMain() {
                 <div className="space-y-1">
                   <span className="font-bold">重要提示：</span>
                   <p className="text-muted-foreground">
-                    为了系统安全性，数据库中仅存储令牌的 Hash 摘要值，系统本身无法为您找回此明文密钥。离开此窗口后，您将再也无法查看到它的明文值。
+                    这是您唯一一次能够查看此访问令牌明文密钥的机会。请立即将其复制并安全地保存。
                   </p>
                 </div>
               </div>
@@ -383,7 +411,7 @@ export function AccessTokenMain() {
                 setNewCreatedToken(null)
                 setViewDialogOpen(false)
               }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs h-9 w-full"
+              className="rounded-xl  w-full"
             >
               我已经复制并妥善保存
             </Button>
