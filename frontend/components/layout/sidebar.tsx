@@ -53,7 +53,6 @@ import {
   FileText,
   FolderOpen,
   GalleryVerticalEnd,
-  Home,
   Layers,
   LogOut,
   Palette,
@@ -70,9 +69,6 @@ import {usePublicConfig} from "@/hooks/use-public-config"
 /* 导航数据 */
 const data = {
   navMain: [
-    { title: "首页", url: "/home", icon: Home },
-  ],
-  pixez: [
     { title: "看板", url: "/pixez/dashboard", icon: BarChart3 },
     { title: "账号管理", url: "/pixez/accounts", icon: UsersRound },
     { title: "镜像管理", url: "/pixez/mirrors", icon: GalleryVerticalEnd },
@@ -174,12 +170,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const displayConfig = parseMenuDisplayConfig(config?.menu_display_config)
     return data.navMain.filter((item) => displayConfig[item.url] !== false)
   }, [config])
-
-  const pixezFiltered = React.useMemo(() => {
-    const displayConfig = parseMenuDisplayConfig(config?.menu_display_config)
-    return data.pixez.filter((item) => displayConfig[item.url] !== false)
-  }, [config])
-
+  
   const adminFiltered = React.useMemo(() => {
     const displayConfig = parseMenuDisplayConfig(config?.menu_display_config)
     return data.admin.filter((item) => displayConfig[item.url] !== false)
@@ -333,33 +324,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </SidebarGroupContent>
             </SidebarGroup>
           )}
-
-          {pixezFiltered.length > 0 && (
-            <SidebarGroup className="py-0 pt-4">
-              <SidebarGroupLabel className="text-xs font-normal text-muted-foreground">
-                PixEz
-              </SidebarGroupLabel>
-              <SidebarGroupContent className="py-1">
-                <SidebarMenu className="gap-1">
-                  {pixezFiltered.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        tooltip={item.title}
-                        isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
-                        asChild
-                      >
-                        <Link href={item.url} onClick={handleCloseSidebar}>
-                          {item.icon && <item.icon />}
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
-
           {user?.is_admin && adminFiltered.length > 0 && (
             <SidebarGroup className="py-0 pt-4">
               <SidebarGroupLabel className="text-xs font-normal text-muted-foreground">
