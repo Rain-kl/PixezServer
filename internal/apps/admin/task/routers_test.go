@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
+	"github.com/Rain-kl/Wavelet/internal/apps/upload"
+	"github.com/Rain-kl/Wavelet/internal/apps/user"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
@@ -88,13 +90,13 @@ func TestListTaskTypes(t *testing.T) {
 
 	foundCleanup := false
 	for _, m := range taskMetas {
-		if m.Type == task.TaskTypeCleanupUploads {
+		if m.Type == upload.TaskTypeCleanupUploads {
 			foundCleanup = true
 			break
 		}
 	}
 	if !foundCleanup {
-		t.Errorf("expected task type %s to be listed", task.TaskTypeCleanupUploads)
+		t.Errorf("expected task type %s to be listed", upload.TaskTypeCleanupUploads)
 	}
 }
 
@@ -107,7 +109,7 @@ func TestDispatchTask(t *testing.T) {
 
 	t.Run("dispatch valid task successfully", func(t *testing.T) {
 		payload := DispatchTaskRequest{
-			TaskType: task.TaskTypeCleanupUploads,
+			TaskType: upload.TaskTypeCleanupUploads,
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", "/api/v1/admin/tasks/dispatch", bytes.NewBuffer(body))
@@ -130,7 +132,7 @@ func TestDispatchTask(t *testing.T) {
 
 	t.Run("dispatch send_email task successfully with valid payload", func(t *testing.T) {
 		payload := DispatchTaskRequest{
-			TaskType: task.TaskTypeSendEmail,
+			TaskType: user.TaskTypeSendEmail,
 			Payload:  `{"to":"receiver@example.com","subject":"Test Subject","body":"Test Body"}`,
 		}
 		body, _ := json.Marshal(payload)
@@ -149,7 +151,7 @@ func TestDispatchTask(t *testing.T) {
 
 	t.Run("dispatch send_email task failure with invalid payload json", func(t *testing.T) {
 		payload := DispatchTaskRequest{
-			TaskType: task.TaskTypeSendEmail,
+			TaskType: user.TaskTypeSendEmail,
 			Payload:  `{"to":`,
 		}
 		body, _ := json.Marshal(payload)
@@ -166,7 +168,7 @@ func TestDispatchTask(t *testing.T) {
 
 	t.Run("dispatch send_email task failure with missing fields", func(t *testing.T) {
 		payload := DispatchTaskRequest{
-			TaskType: task.TaskTypeSendEmail,
+			TaskType: user.TaskTypeSendEmail,
 			Payload:  `{"to":"","subject":"Test","body":"Test"}`,
 		}
 		body, _ := json.Marshal(payload)

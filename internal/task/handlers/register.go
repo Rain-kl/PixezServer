@@ -12,12 +12,26 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/task"
 )
 
-// Register registers all built-in task handlers.
+// Register registers all built-in task handlers and their metadata.
 func Register() {
-	task.RegisterHandler(task.CleanupUnusedUploadsTask, &upload.CleanupUnusedUploadsHandler{})
-	task.RegisterHandler(task.SendEmailTask, &user.SendEmailHandler{})
-	task.RegisterHandler(task.PixezMirrorTask, &pixez.MirrorTaskHandler{})
-	task.RegisterHandler(task.PixezExportBookmarksTask, &pixez.ExportBookmarksTaskHandler{})
-	task.RegisterHandler(task.PixezAutoMirrorTask, &pixez.AutoEnqueueBookmarkMirrorsTaskHandler{})
-	task.RegisterHandler(task.PixezImportLegacyTask, &pixez.ImportLegacyServerTaskHandler{})
+	// upload
+	task.RegisterHandler(upload.CleanupUnusedUploadsTask, &upload.CleanupUnusedUploadsHandler{})
+	task.RegisterTaskMeta(upload.CleanupUnusedUploadsMeta)
+
+	// user
+	task.RegisterHandler(user.SendEmailTask, &user.SendEmailHandler{})
+	task.RegisterTaskMeta(user.SendEmailMeta)
+
+	// pixez
+	task.RegisterHandler(pixez.PixezMirrorTask, &pixez.MirrorTaskHandler{})
+	task.RegisterTaskMeta(pixez.PixezMirrorMeta)
+
+	task.RegisterHandler(pixez.PixezExportBookmarksTask, &pixez.ExportBookmarksTaskHandler{})
+	task.RegisterTaskMeta(pixez.PixezExportBookmarksMeta)
+
+	task.RegisterHandler(pixez.PixezAutoMirrorTask, &pixez.AutoEnqueueBookmarkMirrorsTaskHandler{})
+	task.RegisterTaskMeta(pixez.PixezAutoMirrorMeta)
+
+	task.RegisterHandler(pixez.PixezImportLegacyTask, &pixez.ImportLegacyServerTaskHandler{})
+	task.RegisterTaskMeta(pixez.PixezImportLegacyMeta)
 }

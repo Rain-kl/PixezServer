@@ -1,4 +1,3 @@
-// Copyright 2025 linux.do
 // Copyright 2026 Arctel.net
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,6 +15,52 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/util/mail"
 )
+
+// 异步任务名称与管理类型定义
+const (
+	// SendEmailTask 发送邮件任务标识
+	SendEmailTask = "mail:send"
+	// TaskTypeSendEmail 发送邮件管理类型
+	TaskTypeSendEmail = "send_email"
+)
+
+// SendEmailMeta represents the task metadata.
+var SendEmailMeta = task.TaskMeta{
+	Type:         TaskTypeSendEmail,
+	AsynqTask:    SendEmailTask,
+	Name:         "发送邮件",
+	Description:  "异步发送系统邮件",
+	SupportsTime: false,
+	MaxRetry:     task.DefaultMaxRetry,
+	Queue:        task.QueueDefault,
+	Retryable:    true,
+	Params: []task.TaskParam{
+		{
+			Name:        "to",
+			Label:       "接收邮箱 (To)",
+			Type:        "string",
+			Required:    true,
+			Placeholder: "receiver@example.com",
+			Description: "接收邮件的目标邮箱地址",
+		},
+		{
+			Name:        "subject",
+			Label:       "邮件主题 (Subject)",
+			Type:        "string",
+			Required:    true,
+			Placeholder: "请输入邮件主题",
+			Description: "发送邮件的主题标题",
+		},
+		{
+			Name:        "body",
+			Label:       "邮件内容 (Body)",
+			Type:        "text",
+			Required:    true,
+			Placeholder: "请输入邮件内容（支持 HTML 格式）",
+			Description: "发送邮件的内容主体",
+		},
+	},
+}
 
 // SendEmailPayload 邮件发送任务载荷
 type SendEmailPayload struct {

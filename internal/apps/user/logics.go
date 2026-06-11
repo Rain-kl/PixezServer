@@ -109,7 +109,7 @@ func sendEmailVerificationCode(ctx context.Context, email, scene, templateName s
 		Body:    emailBody,
 	}
 	payloadBytes, _ := json.Marshal(payload)
-	_, err = task.DispatchTask(ctx, task.TaskTypeSendEmail, payloadBytes, "system")
+	_, err = task.DispatchTask(ctx, TaskTypeSendEmail, payloadBytes, "system")
 	if err != nil {
 		return errors.New(errDispatchEmailTaskFailed)
 	}

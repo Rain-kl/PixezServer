@@ -386,7 +386,7 @@ func dispatchIllustMirrorIfNeeded(c *gin.Context, illustID int64) (model.PixezMi
 		return record, err
 	}
 	payload, _ := json.Marshal(mirrorPayload{TargetType: TargetTypeIllust, TargetID: illustID})
-	taskID, err := task.DispatchTask(c.Request.Context(), task.TaskTypePixezMirror, payload, "api")
+	taskID, err := task.DispatchTask(c.Request.Context(), TaskTypePixezMirror, payload, "api")
 	if err != nil {
 		return record, err
 	}
@@ -403,7 +403,7 @@ func dispatchNovelMirrorIfNeeded(c *gin.Context, novelID int64) (model.PixezMirr
 		return record, err
 	}
 	payload, _ := json.Marshal(mirrorPayload{TargetType: TargetTypeNovel, TargetID: novelID})
-	taskID, err := task.DispatchTask(c.Request.Context(), task.TaskTypePixezMirror, payload, "api")
+	taskID, err := task.DispatchTask(c.Request.Context(), TaskTypePixezMirror, payload, "api")
 	if err != nil {
 		return record, err
 	}

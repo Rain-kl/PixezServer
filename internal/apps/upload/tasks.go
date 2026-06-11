@@ -16,6 +16,26 @@ import (
 	"gorm.io/gorm"
 )
 
+// 异步任务名称与管理类型定义
+const (
+	// CleanupUnusedUploadsTask 清理未使用上传任务标识
+	CleanupUnusedUploadsTask = "upload:cleanup_unused"
+	// TaskTypeCleanupUploads 清理未使用上传管理类型
+	TaskTypeCleanupUploads = "cleanup_unused_uploads"
+)
+
+// CleanupUnusedUploadsMeta represents the task metadata.
+var CleanupUnusedUploadsMeta = task.TaskMeta{
+	Type:         TaskTypeCleanupUploads,
+	AsynqTask:    CleanupUnusedUploadsTask,
+	Name:         "清理未使用上传",
+	Description:  "清理超过1小时未使用的上传文件",
+	SupportsTime: false,
+	MaxRetry:     task.DefaultMaxRetry,
+	Queue:        task.QueueDefault,
+	Retryable:    true,
+}
+
 // CleanupUnusedUploadsHandler 清理未使用上传文件的异步任务处理器
 type CleanupUnusedUploadsHandler struct{}
 

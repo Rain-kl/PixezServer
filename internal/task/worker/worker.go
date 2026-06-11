@@ -37,14 +37,10 @@ func StartWorker() error {
 	mux := asynq.NewServeMux()
 	mux.Use(taskLoggingMiddleware)
 
-	// 统一使用 task.ProcessTask 处理所有任务类型
-	// 框架内部自动分发到对应的 TaskHandler 实现
-	mux.HandleFunc(task.CleanupUnusedUploadsTask, task.ProcessTask)
-	mux.HandleFunc(task.SendEmailTask, task.ProcessTask)
-	mux.HandleFunc(task.PixezMirrorTask, task.ProcessTask)
-	mux.HandleFunc(task.PixezExportBookmarksTask, task.ProcessTask)
-	mux.HandleFunc(task.PixezAutoMirrorTask, task.ProcessTask)
-	mux.HandleFunc(task.PixezImportLegacyTask, task.ProcessTask)
+	// 动态注册所有已注册的任务处理器路由，框架内部自动分发到对应的 TaskHandler 实现
+	for _, taskName := range task.GetRegisteredAsynqTasks() {
+		mux.HandleFunc(taskName, task.ProcessTask)
+	}
 
 	// 启动服务器
 	return asynqServer.Run(mux)

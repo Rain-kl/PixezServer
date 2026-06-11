@@ -17,7 +17,6 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	pixezsvc "github.com/Rain-kl/Wavelet/internal/service/pixez"
-	"github.com/Rain-kl/Wavelet/internal/task"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -426,10 +425,10 @@ func pixezQueueStatsForTasks(ctx context.Context) (pixezQueueStats, error) {
 
 func pixezTaskTypes() []string {
 	return []string{
-		task.TaskTypePixezMirror,
-		task.TaskTypePixezExportBookmarks,
-		task.TaskTypePixezAutoEnqueueBookmarkMirrors,
-		task.TaskTypePixezImportLegacyServer,
+		TaskTypePixezMirror,
+		TaskTypePixezExportBookmarks,
+		TaskTypePixezAutoEnqueueBookmarkMirrors,
+		TaskTypePixezImportLegacyServer,
 	}
 }
 

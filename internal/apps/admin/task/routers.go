@@ -37,7 +37,7 @@ func init() {
 // @Failure 403 {object} util.ResponseAny "无管理员权限"
 // @Router /api/v1/admin/tasks/types [get]
 func ListTaskTypes(c *gin.Context) {
-	c.JSON(http.StatusOK, util.OK(task.DispatchableTasks))
+	c.JSON(http.StatusOK, util.OK(task.GetDispatchableTasks()))
 }
 
 // DispatchTaskRequest 下发任务请求

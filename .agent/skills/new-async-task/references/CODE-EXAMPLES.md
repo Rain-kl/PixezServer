@@ -2,28 +2,33 @@
 
 这些示例用于新增或修改 Wavelet Asynq 任务时快速套用。复制前先对照当前代码，因为任务框架可能随项目演进。
 
-## 任务元数据
+## 任务元数据与常量定义
 
-在 `internal/task/constants.go` 添加 Asynq task type、Admin task type 和 `TaskMeta`。
+在对应的业务包 `internal/apps/<module>/tasks.go` 中定义 Asynq task type、Admin task type 和 `TaskMeta`。
 
 ```go
+package upload
+
+import (
+    "github.com/Rain-kl/Wavelet/internal/task"
+)
+
 // 异步任务类型标识。格式建议为 "{module}:{action}"。
 const CleanupUnusedUploadsTask = "upload:cleanup_unused"
 
 // 管理员可下发的任务类型标识。用于 Admin API 的 task_type。
 const TaskTypeCleanupUploads = "cleanup_unused_uploads"
 
-var DispatchableTasks = []TaskMeta{
-    {
-        Type:         TaskTypeCleanupUploads,
-        AsynqTask:    CleanupUnusedUploadsTask,
-        Name:         "清理未使用上传",
-        Description:  "清理超过1小时未使用的上传文件",
-        SupportsTime: false,
-        MaxRetry:     defaultMaxRetry,
-        Queue:        QueueDefault,
-        Retryable:    true,
-    },
+// CleanupUnusedUploadsMeta 任务元数据
+var CleanupUnusedUploadsMeta = task.TaskMeta{
+    Type:         TaskTypeCleanupUploads,
+    AsynqTask:    CleanupUnusedUploadsTask,
+    Name:         "清理未使用上传",
+    Description:  "清理超过1小时未使用的上传文件",
+    SupportsTime: false,
+    MaxRetry:     task.DefaultMaxRetry,
+    Queue:        task.QueueDefault,
+    Retryable:    true,
 }
 ```
 
@@ -172,28 +177,6 @@ import (
 func Register() {
     task.RegisterHandler(task.CleanupUnusedUploadsTask, &upload.CleanupUnusedUploadsHandler{})
     task.RegisterHandler(task.SendEmailTask, &user.SendEmailHandler{})
-}
-```
-
-## Worker 路由
-
-在 `internal/task/worker/worker.go` 的 mux 上添加任务类型。所有业务任务都指向 `task.ProcessTask`。
-
-```go
-func StartWorker() error {
-    asynqServer := asynq.NewServer(task.RedisOpt, asynq.Config{
-        Concurrency:     config.Config.Worker.Concurrency,
-        ShutdownTimeout: workerShutdownTimeout,
-        Queues:          buildQueuesFromConfig(),
-        StrictPriority:  config.Config.Worker.StrictPriority,
-    })
-
-    mux := asynq.NewServeMux()
-    mux.Use(taskLoggingMiddleware)
-    mux.HandleFunc(task.CleanupUnusedUploadsTask, task.ProcessTask)
-    mux.HandleFunc(task.SendEmailTask, task.ProcessTask)
-
-    return asynqServer.Run(mux)
 }
 ```
 

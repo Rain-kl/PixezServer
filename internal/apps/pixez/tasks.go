@@ -17,6 +17,94 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/task"
 )
 
+// 异步任务名称与管理类型定义
+const (
+	// PixezMirrorTask 镜像资源任务标识
+	PixezMirrorTask = "pixez:mirror"
+	// PixezExportBookmarksTask 导出收藏任务标识
+	PixezExportBookmarksTask = "pixez:export_bookmarks"
+	// PixezAutoMirrorTask 自动入队收藏镜像任务标识
+	PixezAutoMirrorTask = "pixez:auto_enqueue_bookmark_mirrors"
+	// PixezImportLegacyTask 导入旧后端任务标识
+	PixezImportLegacyTask = "pixez:import_legacy_server"
+
+	// TaskTypePixezMirror 镜像资源管理类型
+	TaskTypePixezMirror = "pixez_mirror"
+	// TaskTypePixezExportBookmarks 导出收藏管理类型
+	TaskTypePixezExportBookmarks = "pixez_export_bookmarks"
+	// TaskTypePixezAutoEnqueueBookmarkMirrors 自动入队收藏镜像管理类型
+	TaskTypePixezAutoEnqueueBookmarkMirrors = "pixez_auto_enqueue_bookmark_mirrors"
+	// TaskTypePixezImportLegacyServer 导入旧后端管理类型
+	TaskTypePixezImportLegacyServer = "pixez_import_legacy_server"
+)
+
+var (
+	// PixezMirrorMeta task metadata
+	PixezMirrorMeta = task.TaskMeta{
+		Type:         TaskTypePixezMirror,
+		AsynqTask:    PixezMirrorTask,
+		Name:         "PixEz 镜像资源",
+		Description:  "抓取 Pixiv 插画或小说详情并保存镜像记录",
+		SupportsTime: false,
+		MaxRetry:     task.DefaultMaxRetry,
+		Queue:        task.QueueDefault,
+		Retryable:    true,
+		Params: []task.TaskParam{
+			{Name: "target_type", Label: "目标类型", Type: "number", Required: true, Placeholder: "0 或 1", Description: "0 表示插画，1 表示小说"},
+			{Name: "target_id", Label: "资源 ID", Type: "number", Required: true, Placeholder: "123456", Description: "Pixiv 插画或小说 ID"},
+		},
+	}
+
+	// PixezExportBookmarksMeta task metadata
+	PixezExportBookmarksMeta = task.TaskMeta{
+		Type:         TaskTypePixezExportBookmarks,
+		AsynqTask:    PixezExportBookmarksTask,
+		Name:         "PixEz 导出收藏",
+		Description:  "导出已同步 Pixiv 账号的插画或小说收藏并增量维护 removed 状态",
+		SupportsTime: false,
+		MaxRetry:     task.DefaultMaxRetry,
+		Queue:        task.QueueDefault,
+		Retryable:    true,
+		Params: []task.TaskParam{
+			{Name: "target_type", Label: "目标类型", Type: "number", Required: false, Placeholder: "0 或 1，留空表示全部", Description: "0 表示插画，1 表示小说，留空表示全部"},
+			{Name: "pixiv_user_id", Label: "Pixiv 用户 ID", Type: "string", Required: false, Placeholder: "留空表示全部账号", Description: "只导出指定 Pixiv 用户时填写"},
+		},
+	}
+
+	// PixezAutoMirrorMeta task metadata
+	PixezAutoMirrorMeta = task.TaskMeta{
+		Type:         TaskTypePixezAutoEnqueueBookmarkMirrors,
+		AsynqTask:    PixezAutoMirrorTask,
+		Name:         "PixEz 收藏自动入队镜像",
+		Description:  "扫描收藏 read-model，把未镜像或失败的收藏批量下发镜像任务",
+		SupportsTime: false,
+		MaxRetry:     task.DefaultMaxRetry,
+		Queue:        task.QueueDefault,
+		Retryable:    true,
+		Params: []task.TaskParam{
+			{Name: "target_type", Label: "目标类型", Type: "number", Required: false, Placeholder: "0 或 1，留空表示全部", Description: "0 表示插画，1 表示小说，留空表示全部"},
+			{Name: "limit", Label: "数量上限", Type: "number", Required: false, Placeholder: "50", Description: "本次最多入队数量"},
+		},
+	}
+
+	// PixezImportLegacyMeta task metadata
+	PixezImportLegacyMeta = task.TaskMeta{
+		Type:         TaskTypePixezImportLegacyServer,
+		AsynqTask:    PixezImportLegacyTask,
+		Name:         "PixEz 导入旧后端",
+		Description:  "从旧 server/pixez-sync.db 和 server/data/mirror 导入业务数据",
+		SupportsTime: false,
+		MaxRetry:     1,
+		Queue:        task.QueueDefault,
+		Retryable:    false,
+		Params: []task.TaskParam{
+			{Name: "sqlite_path", Label: "旧 SQLite 路径", Type: "string", Required: false, Placeholder: "server/pixez-sync.db", Description: "旧 PixEz Sync SQLite 文件"},
+			{Name: "mirror_dir", Label: "旧镜像目录", Type: "string", Required: false, Placeholder: "server/data/mirror", Description: "旧插画镜像文件目录"},
+			{Name: "dry_run", Label: "只预览", Type: "boolean", Required: false, Placeholder: "false", Description: "是否只统计不写入"},
+		},
+	}
+)
+
 type mirrorPayload struct {
 	TargetType int   `json:"target_type"`
 	TargetID   int64 `json:"target_id"`
@@ -295,7 +383,7 @@ func emptyAsAll(value string) string {
 }
 
 func enqueueIllustBookmarkMirrors(ctx context.Context, limit int) (int, error) {
-	return enqueueBookmarkMirrors(ctx, limit, "bookmark_illusts", "illust_id", &model.PixezBookmarkIllust{}, task.TaskTypePixezMirror, func(targetID int64) []byte {
+	return enqueueBookmarkMirrors(ctx, limit, "bookmark_illusts", "illust_id", &model.PixezBookmarkIllust{}, TaskTypePixezMirror, func(targetID int64) []byte {
 		payload, _ := json.Marshal(mirrorPayload{TargetType: TargetTypeIllust, TargetID: targetID})
 		return payload
 	}, func(targetID int64, taskID string) error {
@@ -305,7 +393,7 @@ func enqueueIllustBookmarkMirrors(ctx context.Context, limit int) (int, error) {
 }
 
 func enqueueNovelBookmarkMirrors(ctx context.Context, limit int) (int, error) {
-	return enqueueBookmarkMirrors(ctx, limit, "bookmark_novels", "novel_id", &model.PixezBookmarkNovel{}, task.TaskTypePixezMirror, func(targetID int64) []byte {
+	return enqueueBookmarkMirrors(ctx, limit, "bookmark_novels", "novel_id", &model.PixezBookmarkNovel{}, TaskTypePixezMirror, func(targetID int64) []byte {
 		payload, _ := json.Marshal(mirrorPayload{TargetType: TargetTypeNovel, TargetID: targetID})
 		return payload
 	}, func(targetID int64, taskID string) error {
