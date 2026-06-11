@@ -341,7 +341,7 @@ export function TaskExecutionsManager() {
 
                 <div className="grid gap-2">
                   <Label>执行结果</Label>
-                  <div className="min-h-10 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                  <div className="min-h-10 rounded-md border bg-muted/30 px-3 py-2 text-sm whitespace-pre-wrap break-all">
                     {selectedExecution.result || "-"}
                   </div>
                 </div>
@@ -349,7 +349,7 @@ export function TaskExecutionsManager() {
                 {selectedExecution.error_message && (
                   <div className="grid gap-2">
                     <Label>错误信息</Label>
-                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive whitespace-pre-wrap break-all">
                       {selectedExecution.error_message}
                     </div>
                   </div>

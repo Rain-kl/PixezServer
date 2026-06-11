@@ -58,9 +58,9 @@ func CreateTaskExecution(ctx context.Context, execution *TaskExecution) error {
 	return db.DB(ctx).Create(execution).Error
 }
 
-// UpdateTaskExecution 更新任务执行记录
+// UpdateTaskExecution 更新任务执行记录，忽略 log 字段以防覆写正在追加的日志
 func UpdateTaskExecution(ctx context.Context, execution *TaskExecution) error {
-	return db.DB(ctx).Save(execution).Error
+	return db.DB(ctx).Omit("log").Save(execution).Error
 }
 
 // GetTaskExecutionByTaskID 根据 TaskID 获取执行记录

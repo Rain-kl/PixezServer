@@ -188,6 +188,41 @@ func TestUpdateTaskExecutionFailed(t *testing.T) {
 	assert.Equal(t, int64(200), found.Duration)
 }
 
+func TestUpdateTaskExecutionDoesNotOverwriteLog(t *testing.T) {
+	cleanup := setupTaskExecutionTestEnvironment(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	execution := &TaskExecution{
+		TaskID:      "test_omit_log_001",
+		TaskType:    "upload:cleanup_unused",
+		TaskName:    "清理未使用上传",
+		Status:      TaskExecutionStatusPending,
+		TriggeredBy: "manual",
+	}
+	err := CreateTaskExecution(ctx, execution)
+	require.NoError(t, err)
+
+	// In a real execution, logs are appended to the DB asynchronously via AppendTaskExecutionLog
+	err = AppendTaskExecutionLog(ctx, "test_omit_log_001", "第一条执行日志")
+	require.NoError(t, err)
+
+	// The local struct still has empty Log because it was not reloaded
+	assert.Empty(t, execution.Log)
+
+	// Now complete/update the execution (e.g. status, duration)
+	execution.Status = TaskExecutionStatusSucceeded
+	execution.Duration = 100
+	err = UpdateTaskExecution(ctx, execution)
+	require.NoError(t, err)
+
+	// Get the updated execution record and check that the Log was NOT overwritten/wiped
+	found, err := GetTaskExecutionByTaskID(ctx, "test_omit_log_001")
+	require.NoError(t, err)
+	assert.Equal(t, TaskExecutionStatusSucceeded, found.Status)
+	assert.Contains(t, found.Log, "第一条执行日志")
+}
+
 func TestAppendTaskExecutionLog(t *testing.T) {
 	cleanup := setupTaskExecutionTestEnvironment(t)
 	defer cleanup()
