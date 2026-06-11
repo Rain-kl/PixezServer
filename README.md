@@ -228,6 +228,10 @@ make build-test    # 前后端构建验证
 make build-embedded
 ```
 
+## 友情链接
+
+- LINUX DO —— 新的理想型社区，技术爱好者的聚集地。
+
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
