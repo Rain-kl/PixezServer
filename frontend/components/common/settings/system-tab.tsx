@@ -238,7 +238,6 @@ export function SystemTab({ configs, systemConfigsQuery }: SystemTabProps) {
                 <Button
                   type="submit"
                   size="sm"
-                  className="h-8.5 px-4 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white shadow-md hover:shadow-indigo-500/10 active:scale-[0.98] transition-all"
                   disabled={saveSystemMutation.isPending}
                 >
                   {saveSystemMutation.isPending ? (
