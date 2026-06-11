@@ -13,13 +13,13 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/common"
 	"github.com/Rain-kl/Wavelet/internal/db"
+	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/logger"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/storage"
@@ -103,14 +103,13 @@ func ServeUpload(c *gin.Context, upload *model.Upload) {
 		level = "high"
 	}
 
-	// Local cache path for the compressed webp image
-	cachePath := filepath.Join("uploads", "cache", fmt.Sprintf("compressed_%d_%s.webp", upload.ID, level))
-
-	// Check if the compressed file already exists in cache
-	if _, err := os.Stat(cachePath); err == nil {
-		c.Header("Content-Type", "image/webp")
-		c.File(cachePath)
+	cache := diskcache.GetGlobalCache()
+	cacheKey := imageCompressionCacheKey(upload, level)
+	if webpBytes, err := cache.Get(cacheKey); err == nil {
+		c.Data(http.StatusOK, "image/webp", webpBytes)
 		return
+	} else if !errors.Is(err, diskcache.ErrCacheMiss) {
+		logger.WarnF(c.Request.Context(), "failed to read compressed image cache: %v", err)
 	}
 
 	// Cache miss: retrieve original file content
@@ -129,16 +128,23 @@ func ServeUpload(c *gin.Context, upload *model.Upload) {
 		return
 	}
 
-	// Ensure cache directory exists and write cached file
-	if err := os.MkdirAll(filepath.Dir(cachePath), cacheDirPerm); err != nil {
-		logger.ErrorF(c.Request.Context(), "failed to create cache directory: %v", err)
-	} else if err := os.WriteFile(cachePath, webpBytes, cacheFilePerm); err != nil {
-		logger.ErrorF(c.Request.Context(), "failed to write compressed cache file: %v", err)
+	if err := cache.Set(cacheKey, webpBytes, 0); err != nil {
+		logger.WarnF(c.Request.Context(), "failed to cache compressed image: %v", err)
 	}
 
 	// Serve compressed WebP
-	c.Header("Content-Type", "image/webp")
 	c.Data(http.StatusOK, "image/webp", webpBytes)
+}
+
+func imageCompressionCacheKey(upload *model.Upload, level string) string {
+	return fmt.Sprintf(
+		"upload_webp_v1_%d_%d_%d_%s_%s",
+		upload.ID,
+		upload.UpdatedAt.UnixNano(),
+		upload.FileSize,
+		upload.Hash,
+		level,
+	)
 }
 
 // serveOriginal 原始文件的流式响应逻辑

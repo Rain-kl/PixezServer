@@ -18,6 +18,13 @@
 - 所有 HTTP 路由仅在 `internal/router/router.go` 中注册。
 - 当 API Handler 发生变化时，更新 Swagger 文档（运行 `make swagger`）。
 - 在提交更改前运行 `make code-check`。
+- 需要缓存或文件管理能力时，必须复用现有平台实现，禁止在业务包中自行创建缓存目录、直接管理缓存文件或重复封装存储后端。
+
+## 缓存与文件能力
+
+- `internal/diskcache`：通过 `diskcache.GetGlobalCache()` 提供字节缓存读写、TTL、最大空间限制、LRU 淘汰、清空、状态统计和配置热更新。
+- `internal/storage`：提供 S3 兼容对象上传、读取、删除、CDN/代理读取及远端文件本地缓存。
+- `internal/apps/upload`：提供上传记录、文件访问控制、本地/S3 文件响应、下载及图片 WebP 压缩；业务应复用这些入口，不直接操作底层文件。
 
 ## 常用命令
 

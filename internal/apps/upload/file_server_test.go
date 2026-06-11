@@ -13,10 +13,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/Rain-kl/Wavelet/internal/common"
+	"github.com/Rain-kl/Wavelet/internal/diskcache"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/gin-contrib/sessions"
@@ -205,9 +205,19 @@ func TestImageCompression(t *testing.T) {
 	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()
 
+	cache := diskcache.GetGlobalCache()
+	if err := cache.Clear(); err != nil {
+		t.Fatalf("failed to clear disk cache before test: %v", err)
+	}
+
 	// Ensure uploads dir is cleaned up
 	defer func() {
 		_ = os.RemoveAll("uploads")
+	}()
+	defer func() {
+		if err := cache.Clear(); err != nil {
+			t.Errorf("failed to clear disk cache after test: %v", err)
+		}
 	}()
 
 	// Create test user
@@ -282,25 +292,31 @@ func TestImageCompression(t *testing.T) {
 			t.Errorf("expected Content-Type image/webp, got %s", w.Header().Get("Content-Type"))
 		}
 
-		// Check if local cache file was created
-		cachePath := filepath.Join("uploads", "cache", "compressed_3001_medium.webp")
-		if _, err := os.Stat(cachePath); os.IsNotExist(err) {
-			t.Errorf("expected cached webp file to be created at %s, but it doesn't exist", cachePath)
+		cacheKey := imageCompressionCacheKey(&uploadRecord, "medium")
+		cachedBytes, err := cache.Get(cacheKey)
+		if err != nil {
+			t.Fatalf("disk cache Get(%q) returned error: %v", cacheKey, err)
+		}
+		if !bytes.Equal(cachedBytes, w.Body.Bytes()) {
+			t.Errorf("cached compressed image differs from response")
 		}
 
-		// Subsequent request should hit the cache (modify the cached file to verify)
-		testBytes := []byte("cached webp content")
-		if err := os.WriteFile(cachePath, testBytes, 0644); err != nil {
-			t.Fatalf("failed to write test bytes to cache: %v", err)
+		if err := os.Remove(filePath); err != nil {
+			t.Fatalf("failed to remove source image before cache-hit request: %v", err)
 		}
+		t.Cleanup(func() {
+			if err := os.WriteFile(filePath, pngBuf.Bytes(), 0644); err != nil {
+				t.Errorf("failed to restore source image: %v", err)
+			}
+		})
 
 		w2 := httptest.NewRecorder()
 		r.ServeHTTP(w2, req)
 		if w2.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", w2.Code)
 		}
-		if string(w2.Body.Bytes()) != "cached webp content" {
-			t.Errorf("expected cached content, got %s", string(w2.Body.Bytes()))
+		if !bytes.Equal(w2.Body.Bytes(), cachedBytes) {
+			t.Errorf("cache-hit response differs from cached compressed image")
 		}
 	})
 
@@ -312,10 +328,9 @@ func TestImageCompression(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", w.Code)
 		}
-		// Check if local cache file with "high" was created
-		cachePath := filepath.Join("uploads", "cache", "compressed_3001_high.webp")
-		if _, err := os.Stat(cachePath); os.IsNotExist(err) {
-			t.Errorf("expected cached webp file to be created at %s for default level", cachePath)
+		cacheKey := imageCompressionCacheKey(&uploadRecord, "high")
+		if _, err := cache.Get(cacheKey); err != nil {
+			t.Errorf("disk cache Get(%q) returned error: %v", cacheKey, err)
 		}
 	})
 }
