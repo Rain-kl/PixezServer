@@ -4,13 +4,13 @@ services:
 #    build:
 #      context: .
 #      dockerfile: docker/Dockerfile
-    image: ghcr.io/rain-kl/pixezserver:latest
+    image: ghcr.io/rain-kl/pixezsync:latest
     restart: unless-stopped
     env_file: .env
     environment:
       TZ: ${TZ:-Asia/Shanghai}
     ports:
-      - "${APP_PORT:-8061}:8061"
+      - "8061:8061"
     volumes:
       - ./uploads:/app/uploads
       - ./data/:/app/data
@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "6379:6379"
     volumes:
       - ./data/redis_data:/data
     healthcheck:
