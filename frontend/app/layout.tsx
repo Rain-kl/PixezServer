@@ -10,8 +10,8 @@ import {RobotsMeta} from "@/components/layout/robots-meta";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Wavelet Platform",
-  description: "通用二次开发标准范式平台",
+  title: "PixEz Sync",
+  description: "PixEz 同步工具，提供高效的镜像同步与数据导出服务，支持多平台、多协议，满足企业级数据管理需求。",
 };
 
 export default function RootLayout({

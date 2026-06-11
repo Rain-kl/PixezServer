@@ -491,7 +491,7 @@ func listBookmarkIllusts(
 		return nil, 0, err
 	}
 	var rows []model.PixezBookmarkIllust
-	if err := query.Order("updated_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error; err != nil {
+	if err := query.Order("created_at desc, id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	items := make([]pixezIllustBookmarkDTO, 0, len(rows))
@@ -514,7 +514,7 @@ func listBookmarkNovels(
 		return nil, 0, err
 	}
 	var rows []model.PixezBookmarkNovel
-	if err := query.Order("updated_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error; err != nil {
+	if err := query.Order("created_at desc, id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	items := make([]pixezNovelBookmarkDTO, 0, len(rows))
