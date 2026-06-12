@@ -3389,6 +3389,110 @@
                 }
             }
         },
+        "/api/v1/admin/update": {
+            "get": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "从系统配置指定的 GitHub 上游仓库查询最新兼容 Release，并与当前服务版本比较",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "获取应用更新状态",
+                "responses": {
+                    "200": {
+                        "description": "更新状态",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.ResponseAny"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/updater.Status"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "未登录",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "403": {
+                        "description": "无管理员权限",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "500": {
+                        "description": "查询失败",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/update/apply": {
+            "post": {
+                "security": [
+                    {
+                        "SessionCookie": []
+                    }
+                ],
+                "description": "下载当前平台对应的 GitHub Actions Release 资产，替换当前二进制并重启进程",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "下载并应用应用更新",
+                "responses": {
+                    "200": {
+                        "description": "升级已准备并即将重启",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "400": {
+                        "description": "当前版本不可升级",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "401": {
+                        "description": "未登录",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "403": {
+                        "description": "无管理员权限",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    },
+                    "500": {
+                        "description": "升级准备失败",
+                        "schema": {
+                            "$ref": "#/definitions/util.ResponseAny"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/uploads/types": {
             "get": {
                 "security": [
@@ -6692,13 +6796,13 @@
         "task.TaskMeta": {
             "type": "object",
             "properties": {
-                "asynqTask": {
+                "asynq_task": {
                     "type": "string"
                 },
                 "description": {
                     "type": "string"
                 },
-                "maxRetry": {
+                "max_retry": {
                     "type": "integer"
                 },
                 "name": {
@@ -6717,7 +6821,7 @@
                     "description": "是否支持手动重试",
                     "type": "boolean"
                 },
-                "supportsTime": {
+                "supports_time": {
                     "type": "boolean"
                 },
                 "type": {
@@ -6728,27 +6832,27 @@
         "task.TaskParam": {
             "type": "object",
             "properties": {
-                "Description": {
+                "description": {
                     "description": "描述",
                     "type": "string"
                 },
-                "Label": {
+                "label": {
                     "description": "显示名称",
                     "type": "string"
                 },
-                "Name": {
+                "name": {
                     "description": "参数键名",
                     "type": "string"
                 },
-                "Placeholder": {
+                "placeholder": {
                     "description": "占位符",
                     "type": "string"
                 },
-                "Required": {
+                "required": {
                     "description": "是否必填",
                     "type": "boolean"
                 },
-                "Type": {
+                "type": {
                     "description": "类型：string, text, number, boolean",
                     "type": "string"
                 }
@@ -6840,6 +6944,50 @@
                 "type": {
                     "type": "string",
                     "maxLength": 20
+                }
+            }
+        },
+        "updater.Status": {
+            "type": "object",
+            "properties": {
+                "asset_name": {
+                    "type": "string"
+                },
+                "build_time": {
+                    "type": "string"
+                },
+                "can_upgrade": {
+                    "type": "boolean"
+                },
+                "current_version": {
+                    "type": "string"
+                },
+                "latest_version": {
+                    "type": "string"
+                },
+                "platform": {
+                    "type": "string"
+                },
+                "prerelease": {
+                    "type": "boolean"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "release_name": {
+                    "type": "string"
+                },
+                "release_notes": {
+                    "type": "string"
+                },
+                "release_url": {
+                    "type": "string"
+                },
+                "update_available": {
+                    "type": "boolean"
+                },
+                "upstream_repository": {
+                    "type": "string"
                 }
             }
         },

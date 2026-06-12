@@ -14,6 +14,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 	"gorm.io/gorm"
 )
 
@@ -75,6 +76,9 @@ func SetupTestEnvironment(t *testing.T) (*gorm.DB, *miniredis.Miniredis, func())
 	// Hook up Redis Client to miniredis
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
+		MaintNotificationsConfig: &maintnotifications.Config{
+			Mode: maintnotifications.ModeDisabled,
+		},
 	})
 	db.Redis = redisClient
 

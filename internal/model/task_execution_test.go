@@ -14,6 +14,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -30,7 +31,12 @@ func setupTaskExecutionTestEnvironment(t *testing.T) func() {
 
 	miniRedis, err := miniredis.Run()
 	require.NoError(t, err)
-	redisClient := redis.NewClient(&redis.Options{Addr: miniRedis.Addr()})
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: miniRedis.Addr(),
+		MaintNotificationsConfig: &maintnotifications.Config{
+			Mode: maintnotifications.ModeDisabled,
+		},
+	})
 
 	db.SetDB(sqliteDB)
 	db.Redis = redisClient

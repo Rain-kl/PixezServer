@@ -79,9 +79,9 @@ services:
     restart: always
 
   redis:
-    image: redis:7-alpine
+    image: valkey/valkey:8.0-alpine
     container_name: refreshing-redis
-    command: redis-server --requirepass YOUR_REDIS_PASSWORD
+    command: valkey-server --requirepass YOUR_REDIS_PASSWORD
     ports:
       - "6379:6379"
     volumes:

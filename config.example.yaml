@@ -47,20 +47,6 @@ database:
   #   - host: "replica2.db.internal"
   #     port: 5432
 
-# ─── ClickHouse (optional) ──────────────────────────────────────────────────────
-clickhouse:
-  enabled: false
-  hosts:
-    - "127.0.0.1:9000"
-  username: "default"
-  password: ""
-  database: "wavelet"
-  max_idle_conn: 10
-  max_open_conn: 100
-  conn_max_lifetime: 3600
-  dial_timeout: 5
-  block_buffer_size: 10
-
 # ─── Redis ──────────────────────────────────────────────────────────────────────
 # Supports Standalone, Sentinel (HA), and Cluster modes.
 redis:
@@ -128,3 +114,17 @@ s3:
   local_cache:
     enabled: false
     cache_dir: "./s3_cache"
+
+# ─── ClickHouse (optional) ──────────────────────────────────────────────────────
+clickhouse:
+  enabled: false
+  hosts:
+    - "127.0.0.1:9000"
+  username: "default"
+  password: ""
+  database: "wavelet"
+  max_idle_conn: 10
+  max_open_conn: 100
+  conn_max_lifetime: 3600
+  dial_timeout: 5
+  block_buffer_size: 10

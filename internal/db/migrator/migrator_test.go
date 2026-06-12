@@ -13,6 +13,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 	"gorm.io/gorm"
 )
 
@@ -26,12 +27,25 @@ func TestMigrateInitializesSQLiteDatabase(t *testing.T) {
 		t.Fatalf("gorm.Open(sqlite) error = %v", err)
 	}
 
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis.Run() error = %v", err)
+	}
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+		MaintNotificationsConfig: &maintnotifications.Config{
+			Mode: maintnotifications.ModeDisabled,
+		},
+	})
+
 	previousDBEnabled := config.Config.Database.Enabled
 	config.Config.Database.Enabled = false
 	db.SetDB(sqliteDB)
 	t.Cleanup(func() {
 		config.Config.Database.Enabled = previousDBEnabled
 		db.SetDB(nil)
+		_ = redisClient.Close()
+		mr.Close()
 	})
 
 	Migrate()

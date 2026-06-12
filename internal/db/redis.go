@@ -15,6 +15,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/config"
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -45,6 +46,9 @@ func init() {
 			MaxRetries:      cfg.MaxRetries,
 			PoolTimeout:     time.Duration(cfg.PoolTimeout) * time.Second,
 			ConnMaxIdleTime: time.Duration(cfg.ConnMaxIdleTime) * time.Second,
+			MaintNotificationsConfig: &maintnotifications.Config{
+				Mode: maintnotifications.ModeDisabled,
+			},
 		})
 		log.Println("[Redis] initialized in Cluster mode")
 	} else {
@@ -63,6 +67,9 @@ func init() {
 			MaxRetries:      cfg.MaxRetries,
 			PoolTimeout:     time.Duration(cfg.PoolTimeout) * time.Second,
 			ConnMaxIdleTime: time.Duration(cfg.ConnMaxIdleTime) * time.Second,
+			MaintNotificationsConfig: &maintnotifications.Config{
+				Mode: maintnotifications.ModeDisabled,
+			},
 		})
 		if cfg.MasterName != "" {
 			log.Println("[Redis] initialized in Sentinel mode")
