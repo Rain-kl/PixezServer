@@ -23,7 +23,7 @@ build-test:
 	@echo "==> Running frontend and backend build tests in parallel..."
 	@PIDS=""; \
 	STATUS=0; \
-	( cd frontend && pnpm build 2>&1 | sed 's/^/[frontend] /' ) & PIDS="$$PIDS $$!"; \
+	( cd frontend && pnpm build:embed 2>&1 | sed 's/^/[frontend] /' ) & PIDS="$$PIDS $$!"; \
 	( go test ./... && go build -o /dev/null ./... 2>&1 | sed 's/^/[backend]  /' ) & PIDS="$$PIDS $$!"; \
 	for PID in $$PIDS; do \
 		wait $$PID || STATUS=1; \

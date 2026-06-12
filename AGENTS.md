@@ -1,17 +1,34 @@
-# Wavelet Agent 索引
+# AGENTS.md — 项目AI助手工作操作手册
 
-本文件是 Wavelet 项目中 Agent 工作的项目级指南。更具体的专门工作流仍保留在 `.agent/skills/` 中。
+本文件面向 AI 开发助手，定义其职责与操作规范。
+
+## Git 提交规范指南
+
+### 提交信息基本格式
+
+每次提交更改时，应当使用以下提交格式:
+
+```text
+<type>(<scope>): <subject>
+
+<body>
+```
+
+* **Type**: 提交类型（例如 `feat`, `fix`, `refactor`, `perf`, `docs`, `chore` 等）。
+* **Scope** (可选): 影响的范围（例如 `api`, `frontend`, `auth`, `mcp` 等）。
+* **Subject**: 简短的一句话描述变更。
+* **Body** (可选): 详细的说明，多行叙述。
 
 ## 务必阅读匹配的 Skill
 
 - `new-api`：在添加或修改自定义业务 API、Handler、服务层逻辑或注册自定义端点时使用。
-- `new-async-task`：在添加或修改 Asynq 任务、定时任务、任务元数据、任务负载验证、任务日志、任务重试行为或 Admin 任务 API 时使用。
-- `new-setting`：在添加或修改启动配置、基于数据库的系统/业务/公开设置、`/admin/system` 参数或 `/admin/settings` 图形化设置时使用。
-- `database-migration`：在添加或修改数据库 Schema、索引、Seed 数据、系统配置默认值、模板默认值、默认管理员数据、goose SQL 迁移或数据库升级流程时使用。
+- `new-async-task`：在添加或修改 Asynq 任务、定时任务时使用。
+- `new-setting`：在添加或修改基于数据库的系统/业务/公开设置、`/admin/system` 参数或 `/admin/settings` 图形化设置时使用。
+- `database-migration`：在数据库升级流程时使用。
 - Go skills：使用针对性的 `go-*` skills 来获取 Go 实现细节，如测试、错误处理、包、Context、并发、日志、文档和审查。
 - `shadcn`：在添加、修改或组合 shadcn/ui 组件时使用。
 
-## 不可逾越的项目红线 (Guardrails)
+## 严格遵循事项 (Guardrails)
 
 - 切勿删除 `frontend/node_modules`；如果需要刷新依赖，请使用 `pnpm install` 重新安装。
 - 保持 `internal/util/` 不引入任何框架。不要从 `internal/util/` 及其子包中导入 Gin、GORM、sessions 或其他 HTTP/框架包。
@@ -20,33 +37,14 @@
 - 在提交更改前运行 `make code-check`。
 - 需要缓存或文件管理能力时，必须复用现有平台实现，禁止在业务包中自行创建缓存目录、直接管理缓存文件或重复封装存储后端。
 
-## 缓存与文件能力
+## 项目介绍
 
-- `internal/diskcache`：通过 `diskcache.GetGlobalCache()` 提供字节缓存读写、TTL、最大空间限制、LRU 淘汰、清空、状态统计和配置热更新。写入时使用 `DefaultExpiration`（全局默认 TTL）、正数 `time.Duration`（业务 TTL）或 `NoExpiration`（值为 `-1`，永不过期）；永久缓存仍受空间限制和 LRU 淘汰。
-- `internal/storage`：提供 S3 兼容对象上传、读取、删除、CDN/代理读取及远端文件本地缓存。
-- `internal/apps/upload`：提供上传记录、文件访问控制、本地/S3 文件响应、下载及图片 WebP 压缩；业务应复用这些入口，不直接操作底层文件。
-
-## 常用命令
-
-| 命令 | 适用场景 |
-| --- | --- |
-| `make code-check` | 提交前的必要检查 |
-| `make build-test` | 功能性构建验证 |
-| `make swagger` | 添加/修改 API 后 |
-| `make build-embedded` | 发布带有内嵌前端的二进制文件 |
-| `make license` | 添加 Go 文件后 |
-| `make license-check` | CI/许可证验证 |
-
-# Wavelet 项目开发指南
-
-本指南用于普通的 Wavelet 开发。如果任务是关于 Asynq/后台/定时任务的，请使用 `new-async-task` 作为详细的工作流。
-
-## 技术栈
+### 技术栈
 
 - 后端：Go 1.25+、Gin、GORM、PostgreSQL、可选 ClickHouse、Redis、Asynq、Cobra、Viper、Swaggo、OpenTelemetry、Zap、AWS SDK v2、Snowflake IDs。
 - 前端：Next.js App Router、TypeScript、Tailwind CSS、pnpm、shadcn/ui。
 
-## 目录结构映射
+### 目录结构与平台能力
 
 顶层目录：
 
@@ -58,17 +56,19 @@
 - `frontend/`：Next.js 应用。
 - `internal/`：私有 Go 后端代码。
 - `scripts/`：本地和 CI 辅助脚本。
-- `support-files/`：辅助部署文件。
+- `support-files/`：部署和数据库辅助文件。
 
 后端目录：
 
 - `internal/cmd/`：用于 API、worker、scheduler、root init 的 Cobra 命令。
 - `internal/config/`：Viper 加载和配置结构体。运行时代码应使用 `config.Config.<Section>.<Field>`。
 - `internal/router/`：唯一的 HTTP 路由注册点。
-- `internal/apps/`：功能模块和 HTTP Handler。
+- `internal/apps/`：按领域组织的 HTTP Handler 和模块逻辑；管理端模块位于 `internal/apps/admin/`。
+- `internal/apps/upload/`：上传记录、文件访问控制、本地/S3 文件响应、下载及图片 WebP 压缩。业务应复用这些入口，不直接操作底层文件。
 - `internal/model/`：GORM 实体和模型级业务方法。
 - `internal/db/`：PostgreSQL、Redis、ClickHouse、GORM 日志、ID 生成和 goose SQL 迁移的布线。
-- `internal/storage/`：兼容 S3 的存储和缓存抽象。
+- `internal/diskcache/`：平台级磁盘字节缓存，通过 `diskcache.GetGlobalCache()` 提供 TTL、最大空间限制、LRU 淘汰、清空、状态统计和配置热更新。写入时使用 `DefaultExpiration`（全局默认 TTL）、正数 `time.Duration`（业务 TTL）或 `NoExpiration`（无 TTL，仍受空间限制和 LRU 淘汰）。
+- `internal/storage/`：S3 兼容对象存储适配，提供对象上传、读取、删除、CDN/代理读取及远端对象本地缓存。
 - `internal/task/`：Asynq 任务框架；参见 `new-async-task` 了解变更。
 - `internal/service/`：当 Handler/Model 层次过于狭窄时使用的复杂业务服务。
 - `internal/common/`：共享的响应、绑定（bind）、常量以及通用错误。
@@ -76,6 +76,7 @@
 - `internal/logger/`：Zap 和 OTel 日志助手。
 - `internal/listener/`：事件监听器和消息/Webhook 消费者。
 - `internal/otel_trace/`：链路追踪（tracing）助手。
+- `internal/testhelper/`：后端测试共享辅助能力。
 
 前端目录：
 
@@ -84,19 +85,27 @@
 - `frontend/components/common/`：跨页面的业务组件。
 - `frontend/components/layout/`：Header、Sidebar、Footer 等应用布局组件。
 - `frontend/components/auth/`、`home/`、`animate-ui/`、`providers/`：特定作用域的 UI 组件。
-- `frontend/contexts/`、`hooks/`、`lib/`、`types/`、`public/`：共享状态、Hook、客户端/实用工具、TypeScript 类型、静态资产。
+- `frontend/lib/services/`：基于 `BaseService` 的类型化 API 服务，按业务域拆分并由 `services` 对象统一导出。
+- `frontend/contexts/`、`hooks/`、`lib/`、`types/`、`public/`：共享状态、Hook、客户端与实用工具、TypeScript 类型、静态资产。
+- `frontend/scripts/`：前端构建和维护脚本。
+- `frontend/.next/`、`frontend/out/`、`frontend/node_modules/`：本地生成或安装的产物，不作为业务源码编辑。
 
 重要的公共组件：
 
-- `components/common/admin/tasks.tsx`：任务分发 UI。
-- `components/common/admin/task-executions.tsx`：任务执行日志/重试 UI。
-- `components/common/admin/system.tsx`：系统配置管理。
-- `components/common/admin/users.tsx`：用户管理。
-- `components/common/general/manage-pannel.tsx`：通用的列表/详情管理器。
-- `components/common/general/password-dialog.tsx`：敏感操作密码确认对话框。
-- `components/common/settings/system-settings.tsx`：管理员系统设置。
+- `frontend/components/common/admin/task-manager.tsx`：任务管理和分发入口。
+- `frontend/components/common/admin/task-executions.tsx`：任务执行日志和重试 UI。
+- `frontend/components/common/admin/task-schedules.tsx`：定时任务管理 UI。
+- `frontend/components/common/admin/system.tsx`：系统参数管理。
+- `frontend/components/common/admin/files.tsx`：上传文件管理。
+- `frontend/components/common/admin/users.tsx`：用户管理。
+- `frontend/components/common/general/manage-pannel.tsx`：通用列表/详情管理器。
+- `frontend/components/common/general/password-dialog.tsx`：敏感操作密码确认对话框。
+- `frontend/components/common/settings/system-settings.tsx`：管理员图形化系统设置。
 
-## 后端规则
+
+## 开发要求
+
+### 后端规则
 
 命名规范：
 
@@ -168,15 +177,9 @@ Handler 规范：
 4. 在 `internal/router/router.go` 中注册路由。
 5. 运行 `make swagger`。
 
-## 前端规则
-
-<!-- BEGIN:nextjs-agent-rules -->
-
-# Next.js: 在编码前务必阅读文档
+### 前端规则
 
 在进行任何 Next.js 工作之前，请在 `node_modules/next/dist/docs/` 中找到并阅读相关文档。您的训练数据已过时 —— 这些文档是唯一的真理来源。
-
-<!-- END:nextjs-agent-rules -->
 
 样式规范：
 
@@ -209,14 +212,3 @@ frontend/lib/services/<service-name>/
 
 - 服务类继承 `BaseService`，定义 `basePath`，并暴露有类型的静态方法。
 - 在 `frontend/lib/services/index.ts` 中注册新服务。
-
-## 质量门禁 (Quality Gates)
-
-- `make code-check`：提交前的必要检查；前端类型检查 + ESLint 以及后端 golangci-lint。
-- `make build-test`：前端和 Go 后端的构建验证。
-- `make swagger`：API 变更后重新生成 Swagger。
-- `make build-embedded`：发布带有前端静态导出嵌入的二进制文件。
-- `make license`：添加 Go 文件后运行。
-- `make license-check`：验证 Go 许可证头。
-
-切勿删除 `frontend/node_modules`；使用 `pnpm install` 刷新依赖。

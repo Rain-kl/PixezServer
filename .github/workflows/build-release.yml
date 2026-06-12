@@ -32,8 +32,36 @@ permissions:
   contents: write
 
 jobs:
+  prepare-message:
+    runs-on: ubuntu-latest
+    outputs:
+      commit_msg: ${{ steps.trans.outputs.commit_msg }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Prepare Commit Message
+        id: trans
+        shell: bash
+        run: |
+          msg=$(git log -1 --pretty=%B)
+          pip install deep-translator > /dev/null 2>&1 || true
+
+          export COMMIT_MSG="$msg"
+          echo "commit_msg<<EOF" >> "$GITHUB_OUTPUT"
+          if [ -f "scripts/translate_commit.py" ]; then
+             python3 scripts/translate_commit.py >> "$GITHUB_OUTPUT"
+          else
+             echo "Translation script not found, using raw message"
+             echo "$msg" >> "$GITHUB_OUTPUT"
+          fi
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
   create-release:
     name: Create Release
+    needs: prepare-message
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.metadata.outputs.version }}
@@ -75,7 +103,7 @@ jobs:
         with:
           tag_name: ${{ steps.metadata.outputs.version }}
           name: ${{ steps.metadata.outputs.version }}
-          generate_release_notes: true
+          body: ${{ needs.prepare-message.outputs.commit_msg }}
           prerelease: ${{ contains(steps.metadata.outputs.version, 'alpha') || contains(steps.metadata.outputs.version, 'beta') || contains(steps.metadata.outputs.version, 'rc') }}
 
   build-frontend:
