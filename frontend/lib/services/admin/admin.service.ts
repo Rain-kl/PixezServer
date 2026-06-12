@@ -1,6 +1,7 @@
 import {BaseService} from '@/lib/services';
 import type {
   AdminUser,
+  AppUpdateStatus,
   AuthSource,
   AuthSourceRequest,
   CacheConfig,
@@ -134,6 +135,16 @@ export class AdminService extends BaseService {
     to: string;
   }): Promise<{ success: boolean; log: string; error: string }> {
     return this.post<{ success: boolean; log: string; error: string }>('/system-configs/smtp/test', request);
+  }
+
+  // ==================== 应用更新 ====================
+
+  static async getUpdateStatus(): Promise<AppUpdateStatus> {
+    return this.get<AppUpdateStatus>('/update');
+  }
+
+  static async applyUpdate(): Promise<void> {
+    return this.post<void>('/update/apply');
   }
 
   /**

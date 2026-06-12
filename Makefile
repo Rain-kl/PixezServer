@@ -45,7 +45,7 @@ cross-build:
 		--file docker/Dockerfile.cross \
 		--target export \
 		--build-arg VERSION=$(or $(VERSION),dev) \
-		--build-arg BUILD_DATE="$(shell date -u +'%Y-%m-%d %H:%M:%S')" \
+		--build-arg BUILD_DATE="$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')" \
 		$(if $(GOOS),--build-arg TARGET_OS=$(GOOS)) \
 		$(if $(GOARCH),--build-arg TARGET_ARCH=$(GOARCH)) \
 		--output type=local,dest=./bin \

@@ -51,6 +51,7 @@ changed=0
 find_go_files() {
   find . \
     \( -path './.*' \
+    -o -path './*-source' \
     -o -path './docs' \
     -o -path './frontend/node_modules' \
     -o -path './frontend/.next' \

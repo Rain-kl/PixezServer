@@ -30,6 +30,7 @@ RUN pnpm build:embed
 FROM golang:${GO_VERSION}-alpine AS backend-builder
 
 ARG VERSION=dev
+ARG BUILD_DATE=""
 
 RUN apk add --no-cache ca-certificates git
 
@@ -44,7 +45,7 @@ COPY --from=frontend-builder /workspace/frontend/out ./internal/router/dist
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -tags embed_frontend \
     -trimpath \
-    -ldflags="-s -w -X github.com/Rain-kl/Wavelet/internal/cmd.Version=${VERSION}" \
+    -ldflags="-s -w -X github.com/Rain-kl/Wavelet/internal/buildinfo.Version=${VERSION} -X github.com/Rain-kl/Wavelet/internal/buildinfo.BuildTime=${BUILD_DATE}" \
     -o /out/wavelet \
     ./main.go
 

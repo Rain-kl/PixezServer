@@ -95,7 +95,7 @@ jobs:
           {
             echo "version=$version"
             echo "version_without_v=${version#v}"
-            echo "build_date=$(date -u +'%Y-%m-%d %H:%M:%S')"
+            echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_OUTPUT"
 
       - name: Create release
@@ -201,6 +201,8 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
+          VERSION: ${{ needs.create-release.outputs.version }}
+          BUILD_DATE: ${{ needs.create-release.outputs.build_date }}
         run: |
           set -euo pipefail
 
@@ -210,9 +212,10 @@ jobs:
             binary_name="${binary_name}.exe"
           fi
 
+          ldflags="$GO_LDFLAGS -X github.com/Rain-kl/Wavelet/internal/buildinfo.Version=$VERSION -X github.com/Rain-kl/Wavelet/internal/buildinfo.BuildTime=$BUILD_DATE"
           build_args=(
             -trimpath
-            -ldflags "$GO_LDFLAGS"
+            -ldflags "$ldflags"
             -o "dist/$binary_name"
           )
 

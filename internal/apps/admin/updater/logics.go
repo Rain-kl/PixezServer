@@ -1,0 +1,454 @@
+// Copyright 2026 Arctel.net
+// SPDX-License-Identifier: Apache-2.0
+
+package updater
+
+import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/Rain-kl/Wavelet/internal/buildinfo"
+	"github.com/Rain-kl/Wavelet/internal/model"
+	"golang.org/x/mod/semver"
+)
+
+const (
+	githubAPIBaseURL = "https://api.github.com"
+	maxArchiveSize   = int64(1024 * 1024 * 1024)
+	maxReleaseSize   = int64(4 * 1024 * 1024)
+	repositoryParts  = 2
+	windowsOS        = "windows"
+	archiveFileMode  = 0o600
+	stagedBinaryMode = 0o700
+)
+
+type releaseAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+	Size               int64  `json:"size"`
+	State              string `json:"state"`
+}
+
+type githubRelease struct {
+	TagName    string         `json:"tag_name"`
+	Name       string         `json:"name"`
+	Body       string         `json:"body"`
+	HTMLURL    string         `json:"html_url"`
+	Draft      bool           `json:"draft"`
+	Prerelease bool           `json:"prerelease"`
+	Published  time.Time      `json:"published_at"`
+	Assets     []releaseAsset `json:"assets"`
+}
+
+// Status describes the current build and the newest compatible upstream release.
+type Status struct {
+	CurrentVersion     string `json:"current_version"`
+	BuildTime          string `json:"build_time"`
+	LatestVersion      string `json:"latest_version"`
+	UpdateAvailable    bool   `json:"update_available"`
+	CanUpgrade         bool   `json:"can_upgrade"`
+	Prerelease         bool   `json:"prerelease"`
+	ReleaseName        string `json:"release_name"`
+	ReleaseNotes       string `json:"release_notes"`
+	ReleaseURL         string `json:"release_url"`
+	PublishedAt        string `json:"published_at"`
+	UpstreamRepository string `json:"upstream_repository"`
+	AssetName          string `json:"asset_name"`
+	Platform           string `json:"platform"`
+}
+
+type releaseClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+type manager struct {
+	client    releaseClient
+	mu        sync.Mutex
+	upgrading bool
+}
+
+var defaultManager = &manager{
+	client: &http.Client{Timeout: 10 * time.Minute},
+}
+
+func normalizeVersion(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" || version == "dev" {
+		return ""
+	}
+	if !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	if !semver.IsValid(version) {
+		return ""
+	}
+	return version
+}
+
+func parseRepository(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", errors.New(errInvalidRepository)
+	}
+
+	if !strings.Contains(raw, "://") {
+		repo := strings.TrimSuffix(strings.Trim(raw, "/"), ".git")
+		if len(strings.Split(repo, "/")) == repositoryParts {
+			return repo, nil
+		}
+		return "", errors.New(errInvalidRepository)
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
+		return "", errors.New(errInvalidRepository)
+	}
+	repo := strings.TrimSuffix(strings.Trim(parsed.Path, "/"), ".git")
+	if len(strings.Split(repo, "/")) != repositoryParts {
+		return "", errors.New(errInvalidRepository)
+	}
+	return repo, nil
+}
+
+func expectedAssetName(tag string) string {
+	extension := "tar.gz"
+	if runtime.GOOS == windowsOS {
+		extension = "zip"
+	}
+	return fmt.Sprintf("wavelet_%s_%s_%s.%s", tag, runtime.GOOS, runtime.GOARCH, extension)
+}
+
+func selectLatestRelease(releases []githubRelease) (githubRelease, releaseAsset, error) {
+	var selected githubRelease
+	var selectedAsset releaseAsset
+	selectedVersion := ""
+
+	for _, release := range releases {
+		version := normalizeVersion(release.TagName)
+		if release.Draft || version == "" {
+			continue
+		}
+		expectedName := expectedAssetName(release.TagName)
+		for _, asset := range release.Assets {
+			if asset.Name != expectedName || asset.BrowserDownloadURL == "" || asset.State != "uploaded" {
+				continue
+			}
+			if selectedVersion == "" || semver.Compare(version, selectedVersion) > 0 {
+				selected = release
+				selectedAsset = asset
+				selectedVersion = version
+			}
+		}
+	}
+
+	if selectedVersion == "" {
+		return githubRelease{}, releaseAsset{}, errors.New(errNoCompatibleRelease)
+	}
+	return selected, selectedAsset, nil
+}
+
+func (m *manager) fetchRelease(ctx context.Context, repository string) (githubRelease, releaseAsset, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		fmt.Sprintf("%s/repos/%s/releases?per_page=30", githubAPIBaseURL, repository),
+		nil,
+	)
+	if err != nil {
+		return githubRelease{}, releaseAsset{}, fmt.Errorf("%s: %w", errReleaseRequestFailed, err)
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "Wavelet-Updater")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := m.client.Do(req)
+	if err != nil {
+		return githubRelease{}, releaseAsset{}, fmt.Errorf("%s: %w", errReleaseRequestFailed, err)
+	}
+	defer func() {
+		// The response body is read-only; close errors cannot affect the parsed result.
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode != http.StatusOK {
+		return githubRelease{}, releaseAsset{}, fmt.Errorf("%s: HTTP %d", errReleaseRequestFailed, resp.StatusCode)
+	}
+
+	var releases []githubRelease
+	decoder := json.NewDecoder(io.LimitReader(resp.Body, maxReleaseSize))
+	if err := decoder.Decode(&releases); err != nil {
+		return githubRelease{}, releaseAsset{}, fmt.Errorf("%s: %w", errReleaseResponseInvalid, err)
+	}
+	return selectLatestRelease(releases)
+}
+
+func loadRepository(ctx context.Context) (string, error) {
+	var config model.SystemConfig
+	if err := config.GetByKey(ctx, model.ConfigKeyUpdateUpstreamRepository); err != nil {
+		return "", fmt.Errorf("%s: %w", errInvalidRepository, err)
+	}
+	return parseRepository(config.Value)
+}
+
+func (m *manager) status(ctx context.Context) (Status, releaseAsset, error) {
+	repository, err := loadRepository(ctx)
+	if err != nil {
+		return Status{}, releaseAsset{}, err
+	}
+	release, asset, err := m.fetchRelease(ctx, repository)
+	if err != nil {
+		return Status{}, releaseAsset{}, err
+	}
+
+	currentVersion := normalizeVersion(buildinfo.Version)
+	latestVersion := normalizeVersion(release.TagName)
+	updateAvailable := currentVersion != "" && semver.Compare(latestVersion, currentVersion) > 0
+
+	return Status{
+		CurrentVersion:     buildinfo.Version,
+		BuildTime:          buildinfo.BuildTime,
+		LatestVersion:      release.TagName,
+		UpdateAvailable:    updateAvailable,
+		CanUpgrade:         updateAvailable && runtime.GOOS != windowsOS,
+		Prerelease:         release.Prerelease,
+		ReleaseName:        release.Name,
+		ReleaseNotes:       release.Body,
+		ReleaseURL:         release.HTMLURL,
+		PublishedAt:        release.Published.Format(time.RFC3339),
+		UpstreamRepository: repository,
+		AssetName:          asset.Name,
+		Platform:           runtime.GOOS + "/" + runtime.GOARCH,
+	}, asset, nil
+}
+
+func downloadArchive(ctx context.Context, client releaseClient, asset releaseAsset, destination string) error {
+	if asset.Size <= 0 || asset.Size > maxArchiveSize {
+		return fmt.Errorf("release 资产大小无效: %d", asset.Size)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.BrowserDownloadURL, nil)
+	if err != nil {
+		return fmt.Errorf("创建升级下载请求失败: %w", err)
+	}
+	req.Header.Set("User-Agent", "Wavelet-Updater")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("下载升级资产失败: %w", err)
+	}
+	defer func() {
+		// The downloaded body has already been validated by size before use.
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("下载升级资产失败: HTTP %d", resp.StatusCode)
+	}
+
+	file, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, archiveFileMode) //nolint:gosec // destination is created inside the verified executable directory.
+	if err != nil {
+		return fmt.Errorf("创建升级归档失败: %w", err)
+	}
+
+	written, err := io.Copy(file, io.LimitReader(resp.Body, maxArchiveSize+1))
+	if err != nil {
+		_ = file.Close()
+		return fmt.Errorf("写入升级归档失败: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("关闭升级归档失败: %w", err)
+	}
+	if written > maxArchiveSize || written != asset.Size {
+		return fmt.Errorf("升级归档大小不匹配: got %d, want %d", written, asset.Size)
+	}
+	return nil
+}
+
+func safeArchivePath(destination, name string) (string, error) {
+	cleanName := filepath.Clean(name)
+	if filepath.IsAbs(cleanName) || cleanName == "." || strings.HasPrefix(cleanName, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("归档包含非法路径: %s", name)
+	}
+	target := filepath.Join(destination, cleanName)
+	relative, err := filepath.Rel(destination, target)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("归档路径越界: %s", name)
+	}
+	return target, nil
+}
+
+func extractTarGz(archivePath, destination, binaryName string) (string, error) {
+	file, err := os.Open(archivePath) //nolint:gosec // archivePath is created by prepareUpgrade in the executable directory.
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		// Read-only archive close errors do not change extraction validity.
+		_ = file.Close()
+	}()
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		// The gzip checksum is verified while reading the selected file.
+		_ = gzipReader.Close()
+	}()
+
+	reader := tar.NewReader(gzipReader)
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		if header.Typeflag != tar.TypeReg || filepath.Base(header.Name) != binaryName {
+			continue
+		}
+		target, err := safeArchivePath(destination, binaryName)
+		if err != nil {
+			return "", err
+		}
+		output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, stagedBinaryMode) //nolint:gosec // target is constrained by safeArchivePath.
+		if err != nil {
+			return "", err
+		}
+		written, copyErr := io.Copy(output, io.LimitReader(reader, maxArchiveSize+1))
+		closeErr := output.Close()
+		if copyErr != nil {
+			return "", copyErr
+		}
+		if closeErr != nil {
+			return "", closeErr
+		}
+		if written > maxArchiveSize {
+			return "", errors.New("解压后的程序文件超过大小限制")
+		}
+		return target, nil
+	}
+	return "", errors.New(errNoCompatibleAsset)
+}
+
+func extractZip(archivePath, destination, binaryName string) (string, error) {
+	reader, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		// Read-only archive close errors do not change extraction validity.
+		_ = reader.Close()
+	}()
+	for _, file := range reader.File {
+		if file.FileInfo().IsDir() || filepath.Base(file.Name) != binaryName {
+			continue
+		}
+		target, err := safeArchivePath(destination, binaryName)
+		if err != nil {
+			return "", err
+		}
+		input, err := file.Open()
+		if err != nil {
+			return "", err
+		}
+		output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, stagedBinaryMode) //nolint:gosec // target is constrained by safeArchivePath.
+		if err != nil {
+			// The output was not opened, so there is no useful recovery action for a read-only close failure.
+			_ = input.Close()
+			return "", err
+		}
+		written, copyErr := io.Copy(output, io.LimitReader(input, maxArchiveSize+1))
+		inputCloseErr := input.Close()
+		outputCloseErr := output.Close()
+		if copyErr != nil {
+			return "", copyErr
+		}
+		if inputCloseErr != nil {
+			return "", inputCloseErr
+		}
+		if outputCloseErr != nil {
+			return "", outputCloseErr
+		}
+		if written > maxArchiveSize {
+			return "", errors.New("解压后的程序文件超过大小限制")
+		}
+		return target, nil
+	}
+	return "", errors.New(errNoCompatibleAsset)
+}
+
+func (m *manager) prepareUpgrade(ctx context.Context) (string, string, error) {
+	if runtime.GOOS == windowsOS {
+		return "", "", errors.New(errAutomaticUpgradeBlocked)
+	}
+	if normalizeVersion(buildinfo.Version) == "" {
+		return "", "", errors.New(errDevelopmentBuild)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.upgrading {
+		return "", "", errors.New(errUpgradeAlreadyRunning)
+	}
+
+	status, asset, err := m.status(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	if !status.UpdateAvailable {
+		return "", "", errors.New(errAlreadyUpToDate)
+	}
+
+	executable, err := os.Executable()
+	if err != nil {
+		return "", "", fmt.Errorf("定位当前程序失败: %w", err)
+	}
+	executable, err = filepath.EvalSymlinks(executable)
+	if err != nil {
+		return "", "", fmt.Errorf("解析当前程序路径失败: %w", err)
+	}
+	tempDir, err := os.MkdirTemp(filepath.Dir(executable), ".wavelet-update-*")
+	if err != nil {
+		return "", "", fmt.Errorf("创建升级目录失败: %w", err)
+	}
+
+	archivePath := filepath.Join(tempDir, asset.Name)
+	if err := downloadArchive(ctx, m.client, asset, archivePath); err != nil {
+		// Cleanup is best effort because the download error is the actionable failure.
+		_ = os.RemoveAll(tempDir)
+		return "", "", err
+	}
+	binaryName := "wavelet"
+	if runtime.GOOS == windowsOS {
+		binaryName += ".exe"
+	}
+	stagedBinary, err := extractTarGz(archivePath, tempDir, binaryName)
+	if strings.HasSuffix(asset.Name, ".zip") {
+		stagedBinary, err = extractZip(archivePath, tempDir, binaryName)
+	}
+	if err != nil {
+		// Cleanup is best effort because the extraction error is the actionable failure.
+		_ = os.RemoveAll(tempDir)
+		return "", "", fmt.Errorf("解压升级资产失败: %w", err)
+	}
+	m.upgrading = true
+	return executable, stagedBinary, nil
+}
+
+func (m *manager) finishUpgrade() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.upgrading = false
+}

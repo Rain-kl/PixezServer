@@ -439,6 +439,25 @@ export interface DatabaseInfo {
   version: string;
 }
 
+/**
+ * 应用更新状态
+ */
+export interface AppUpdateStatus {
+  current_version: string;
+  build_time: string;
+  latest_version: string;
+  update_available: boolean;
+  can_upgrade: boolean;
+  prerelease: boolean;
+  release_name: string;
+  release_notes: string;
+  release_url: string;
+  published_at: string;
+  upstream_repository: string;
+  asset_name: string;
+  platform: string;
+}
+
 // ==================== 缓存管理 ====================
 
 /**
@@ -470,4 +489,3 @@ export interface CacheConfig {
   /** 是否启用 LRU 淘汰 */
   lru_enabled: boolean;
 }
-

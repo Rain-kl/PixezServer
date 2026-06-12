@@ -23,6 +23,7 @@ import (
 	admin_status "github.com/Rain-kl/Wavelet/internal/apps/admin/status"
 	admin_task "github.com/Rain-kl/Wavelet/internal/apps/admin/task"
 	admin_template "github.com/Rain-kl/Wavelet/internal/apps/admin/template"
+	admin_updater "github.com/Rain-kl/Wavelet/internal/apps/admin/updater"
 	admin_user "github.com/Rain-kl/Wavelet/internal/apps/admin/user"
 	capApp "github.com/Rain-kl/Wavelet/internal/apps/cap"
 	publicconfig "github.com/Rain-kl/Wavelet/internal/apps/config"
@@ -234,6 +235,10 @@ func registerRoutes(r *gin.Engine) {
 				adminRouter.GET("/cache/status", admin_cache.GetCacheStatus)
 				adminRouter.POST("/cache/config", admin_cache.UpdateCacheConfig)
 				adminRouter.POST("/cache/clear", admin_cache.ClearCache)
+
+				// Application update
+				adminRouter.GET("/update", admin_updater.GetUpdateStatus)
+				adminRouter.POST("/update/apply", admin_updater.ApplyUpdate)
 
 				// System logs
 				adminRouter.GET("/logs", admin_logs.GetLogs)

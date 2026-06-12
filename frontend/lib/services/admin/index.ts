@@ -42,6 +42,7 @@ export type {
   UpdateUserStatusRequest,
   SystemStatus,
   DatabaseInfo,
+  AppUpdateStatus,
   Schedule,
   CreateScheduleRequest,
   UpdateScheduleRequest,

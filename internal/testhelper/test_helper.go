@@ -286,6 +286,12 @@ func getSeedConfigsPart2() []model.SystemConfig {
 			Type:        configTypeSystem,
 			Description: "登录会话过期时间 (小时，0表示浏览器关闭后自动退出，-1表示永不过期)",
 		},
+		{
+			Key:         model.ConfigKeyUpdateUpstreamRepository,
+			Value:       "Rain-kl/Wavelet",
+			Type:        configTypeSystem,
+			Description: "GitHub Actions Release 上游仓库（owner/repo 或 GitHub 仓库地址）",
+		},
 	}
 }
 

@@ -7,16 +7,10 @@ package cmd
 import (
 	"log"
 
+	"github.com/Rain-kl/Wavelet/internal/buildinfo"
 	"github.com/Rain-kl/Wavelet/internal/db/migrator"
 	"github.com/spf13/cobra"
 )
-
-// Version is the application version string. It is set at link time via:
-//
-//	-ldflags="-X github.com/Rain-kl/Wavelet/internal/cmd.Version=<version>"
-//
-// When not set (e.g. local `go run`), the value defaults to "dev".
-var Version = "dev"
 
 var rootCmd = &cobra.Command{
 	Use: "wavelet",
@@ -46,7 +40,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Version = Version
+	rootCmd.Version = buildinfo.Version
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
 
