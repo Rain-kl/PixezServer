@@ -292,6 +292,9 @@ func checkPrivateFileOwner(c *gin.Context, ownerID uint64) error {
 			return err
 		}
 	}
+	if currUser.IsAdmin {
+		return nil
+	}
 	if currUser.ID != ownerID {
 		return errors.New("forbidden: cross-user access denied")
 	}

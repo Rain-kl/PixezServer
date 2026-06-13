@@ -36,21 +36,30 @@ type testResponse struct {
 func setupTestRouter(authUser *model.User) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	uploadGroup := r.Group("/api/v1/upload")
 
-	// Mock authentication middleware
-	uploadGroup.Use(func(c *gin.Context) {
+	authMiddleware := func(c *gin.Context) {
 		if authUser != nil {
 			util.SetToContext(c, oauth.UserObjKey, authUser)
 		}
 		c.Next()
-	})
+	}
 
-	uploadGroup.POST("", UploadFile)
-	uploadGroup.GET("/my", ListMyFiles)
-	uploadGroup.GET("/stats", GetFileStats)
-	uploadGroup.GET("/download/:id", DownloadFile)
-	uploadGroup.POST("/download/batch", BatchDownloadFiles)
+	uploadGroup := r.Group("/api/v1/upload")
+	uploadGroup.Use(authMiddleware)
+	{
+		uploadGroup.POST("", UploadFile)
+	}
+
+	adminGroup := r.Group("/api/v1/admin/uploads")
+	adminGroup.Use(authMiddleware)
+	{
+		adminGroup.GET("", ListFiles)
+		adminGroup.GET("/stats", GetFileStats)
+		adminGroup.DELETE("/:id", DeleteFile)
+		adminGroup.GET("/download/:id", DownloadFile)
+		adminGroup.POST("/download/batch", BatchDownloadFiles)
+	}
+
 	return r
 }
 
@@ -356,7 +365,7 @@ func TestDownloadFile(t *testing.T) {
 	dbConn.Create(&localUpload)
 
 	t.Run("download file successfully", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/v1/upload/download/2001", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/admin/uploads/download/2001", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -381,7 +390,7 @@ func TestDownloadFile(t *testing.T) {
 	})
 
 	t.Run("download non-existent file", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/v1/upload/download/9999", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/admin/uploads/download/9999", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -391,7 +400,7 @@ func TestDownloadFile(t *testing.T) {
 	})
 }
 
-func TestListMyFiles(t *testing.T) {
+func TestListFiles(t *testing.T) {
 	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
 	defer cleanup()
 
@@ -451,7 +460,7 @@ func TestListMyFiles(t *testing.T) {
 	}
 
 	t.Run("returns requested page", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/v1/upload/my?page=2&page_size=2", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/admin/uploads?page=2&page_size=2", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -460,29 +469,29 @@ func TestListMyFiles(t *testing.T) {
 			t.Fatalf("failed to parse response: %v", err)
 		}
 		if resp.ErrorMsg != "" {
-			t.Fatalf("ListMyFiles() error = %q, want empty", resp.ErrorMsg)
+			t.Fatalf("ListFiles() error = %q, want empty", resp.ErrorMsg)
 		}
 
-		var got listMyFilesResponse
+		var got listFilesResponse
 		if err := json.Unmarshal(resp.Data, &got); err != nil {
 			t.Fatalf("failed to parse list response: %v", err)
 		}
 		if got.Page != 2 {
-			t.Errorf("ListMyFiles(page=2).Page = %d, want 2", got.Page)
+			t.Errorf("ListFiles(page=2).Page = %d, want 2", got.Page)
 		}
 		if got.PageSize != 2 {
-			t.Errorf("ListMyFiles(page_size=2).PageSize = %d, want 2", got.PageSize)
+			t.Errorf("ListFiles(page_size=2).PageSize = %d, want 2", got.PageSize)
 		}
-		if got.Total != 3 {
-			t.Errorf("ListMyFiles().Total = %d, want 3", got.Total)
+		if got.Total != 4 {
+			t.Errorf("ListFiles().Total = %d, want 4", got.Total)
 		}
-		if len(got.Items) != 1 {
-			t.Fatalf("ListMyFiles(page=2, page_size=2) returned %d items, want 1", len(got.Items))
+		if len(got.Items) != 2 {
+			t.Fatalf("ListFiles(page=2, page_size=2) returned %d items, want 2", len(got.Items))
 		}
 	})
 
 	t.Run("filters filename case insensitively", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/v1/upload/my?keyword=photo", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/admin/uploads?keyword=photo", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -491,21 +500,46 @@ func TestListMyFiles(t *testing.T) {
 			t.Fatalf("failed to parse response: %v", err)
 		}
 		if resp.ErrorMsg != "" {
-			t.Fatalf("ListMyFiles(keyword=photo) error = %q, want empty", resp.ErrorMsg)
+			t.Fatalf("ListFiles(keyword=photo) error = %q, want empty", resp.ErrorMsg)
 		}
 
-		var got listMyFilesResponse
+		var got listFilesResponse
 		if err := json.Unmarshal(resp.Data, &got); err != nil {
 			t.Fatalf("failed to parse list response: %v", err)
 		}
 		if got.Total != 1 {
-			t.Errorf("ListMyFiles(keyword=photo).Total = %d, want 1", got.Total)
+			t.Errorf("ListFiles(keyword=photo).Total = %d, want 1", got.Total)
 		}
 		if len(got.Items) != 1 {
-			t.Fatalf("ListMyFiles(keyword=photo) returned %d items, want 1", len(got.Items))
+			t.Fatalf("ListFiles(keyword=photo) returned %d items, want 1", len(got.Items))
 		}
 		if got.Items[0].FileName != "Second-Photo.PNG" {
-			t.Errorf("ListMyFiles(keyword=photo).Items[0].FileName = %q, want %q", got.Items[0].FileName, "Second-Photo.PNG")
+			t.Errorf("ListFiles(keyword=photo).Items[0].FileName = %q, want %q", got.Items[0].FileName, "Second-Photo.PNG")
+		}
+	})
+
+	t.Run("filters by user_id", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/admin/uploads?user_id=1001", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp testResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to parse response: %v", err)
+		}
+		if resp.ErrorMsg != "" {
+			t.Fatalf("ListFiles(user_id=1001) error = %q, want empty", resp.ErrorMsg)
+		}
+
+		var got listFilesResponse
+		if err := json.Unmarshal(resp.Data, &got); err != nil {
+			t.Fatalf("failed to parse list response: %v", err)
+		}
+		if got.Total != 3 {
+			t.Errorf("ListFiles(user_id=1001).Total = %d, want 3", got.Total)
+		}
+		if len(got.Items) != 3 {
+			t.Fatalf("ListFiles(user_id=1001) returned %d items, want 3", len(got.Items))
 		}
 	})
 }
@@ -573,7 +607,7 @@ func TestBatchDownloadFiles(t *testing.T) {
 		reqBody, _ := json.Marshal(batchDownloadRequest{
 			IDs: []string{"3001", "3002", "3003"},
 		})
-		req, _ := http.NewRequest("POST", "/api/v1/upload/download/batch", bytes.NewReader(reqBody))
+		req, _ := http.NewRequest("POST", "/api/v1/admin/uploads/download/batch", bytes.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 
 		w := httptest.NewRecorder()
@@ -688,7 +722,7 @@ func TestUploadAccessModeAccessControl(t *testing.T) {
 
 	// 3. Verify accessing private file as user1 (owner) succeeds
 	wAccessOwner := httptest.NewRecorder()
-	reqAccessOwner, _ := http.NewRequest("GET", "/api/v1/upload/download/"+strconv.FormatUint(upload1.ID, 10), nil)
+	reqAccessOwner, _ := http.NewRequest("GET", "/api/v1/admin/uploads/download/"+strconv.FormatUint(upload1.ID, 10), nil)
 	router.ServeHTTP(wAccessOwner, reqAccessOwner)
 	if wAccessOwner.Code != http.StatusOK {
 		t.Errorf("owner should be allowed to download private file, got status %d", wAccessOwner.Code)
@@ -697,7 +731,7 @@ func TestUploadAccessModeAccessControl(t *testing.T) {
 	// 4. Verify accessing private file as user2 (non-owner) fails
 	routerUser2 := setupTestRouter(user2)
 	wAccessOther := httptest.NewRecorder()
-	reqAccessOther, _ := http.NewRequest("GET", "/api/v1/upload/download/"+strconv.FormatUint(upload1.ID, 10), nil)
+	reqAccessOther, _ := http.NewRequest("GET", "/api/v1/admin/uploads/download/"+strconv.FormatUint(upload1.ID, 10), nil)
 	routerUser2.ServeHTTP(wAccessOther, reqAccessOther)
 	if wAccessOther.Code != http.StatusUnauthorized {
 		t.Errorf("non-owner should be denied download of private file, got status %d, want 401", wAccessOther.Code)
@@ -705,7 +739,7 @@ func TestUploadAccessModeAccessControl(t *testing.T) {
 
 	// 5. Verify accessing public file as user2 (non-owner) succeeds
 	wAccessPublic := httptest.NewRecorder()
-	reqAccessPublic, _ := http.NewRequest("GET", "/api/v1/upload/download/"+strconv.FormatUint(upload2.ID, 10), nil)
+	reqAccessPublic, _ := http.NewRequest("GET", "/api/v1/admin/uploads/download/"+strconv.FormatUint(upload2.ID, 10), nil)
 	routerUser2.ServeHTTP(wAccessPublic, reqAccessPublic)
 	if wAccessPublic.Code != http.StatusOK {
 		t.Errorf("any logged-in user should be allowed to download public file, got status %d", wAccessPublic.Code)
@@ -768,7 +802,7 @@ func TestGetFileStats(t *testing.T) {
 		}
 	}
 
-	req, _ := http.NewRequest("GET", "/api/v1/upload/stats", nil)
+	req, _ := http.NewRequest("GET", "/api/v1/admin/uploads/stats", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

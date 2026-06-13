@@ -22,10 +22,10 @@ export function FilesMain() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5">
         <div>
           <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text text-transparent">
-            文件管理
+            存储管理
           </h1>
           <p className="text-sm text-muted-foreground">
-            管理您上传的所有文件，支持下载、数据统计与批量操作
+            管理系统存储的所有文件，支持下载、数据统计与批量操作
           </p>
         </div>
       </div>

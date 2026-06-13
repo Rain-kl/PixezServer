@@ -18,6 +18,7 @@ import (
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
+	"github.com/Rain-kl/Wavelet/internal/storage"
 	"github.com/Rain-kl/Wavelet/internal/testhelper"
 	"github.com/Rain-kl/Wavelet/internal/util"
 	"github.com/gin-gonic/gin"
@@ -372,4 +373,62 @@ func TestTestSMTP(t *testing.T) {
 	if !testResp.Success {
 		t.Errorf("expected test success, got failed: %s. Log: %s", testResp.Error, testResp.Log)
 	}
+}
+
+func TestUpdateStorageConfigValidation(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	adminUser := &model.User{ID: 1001, Username: "admin", IsAdmin: true}
+	router := setupTestRouter(adminUser)
+
+	t.Run("update storage config successfully", func(t *testing.T) {
+		tempDir := t.TempDir()
+		cfg := storage.DefaultConfig()
+		cfg.Local.Root = tempDir
+
+		cfgBytes, _ := json.Marshal(cfg)
+		payload := UpdateSystemConfigRequest{
+			Value: string(cfgBytes),
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("PUT", "/api/v1/admin/system-configs/storage_config", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d. Body: %s", w.Code, w.Body.String())
+		}
+
+		// Verify database
+		var dbCfg model.SystemConfig
+		dbConn.Where("key = ?", "storage_config").First(&dbCfg)
+		var savedCfg storage.Config
+		_ = json.Unmarshal([]byte(dbCfg.Value), &savedCfg)
+		if savedCfg.Local.Root != tempDir {
+			t.Errorf("expected local root to be updated to %s, got %s", tempDir, savedCfg.Local.Root)
+		}
+	})
+
+	t.Run("update storage config failed connectivity check", func(t *testing.T) {
+		cfg := storage.DefaultConfig()
+		cfg.Driver = storage.DriverS3
+		cfg.S3.Bucket = "non-existent-bucket"
+		cfg.S3.Endpoint = "http://127.0.0.1:9999" // Will fail connectivity check
+
+		cfgBytes, _ := json.Marshal(cfg)
+		payload := UpdateSystemConfigRequest{
+			Value: string(cfgBytes),
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("PUT", "/api/v1/admin/system-configs/storage_config", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 Bad Request, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
 }

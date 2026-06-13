@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/db"
 	"github.com/Rain-kl/Wavelet/internal/model"
 	"github.com/Rain-kl/Wavelet/internal/util"
@@ -35,20 +34,19 @@ type fileStatsResponse struct {
 	Types      []distributionItem `json:"types"`
 }
 
-// GetFileStats 获取当前登录用户的文件统计数据
+// GetFileStats 获取系统上传的文件统计数据
 // @Summary 获取文件统计数据
-// @Description 返回当前用户的总文件数、占用大小、最近 7 天新增趋势、文件类型/格式分布等数据
-// @Tags upload
+// @Description 返回系统级的总文件数、占用大小、最近 7 天新增趋势、文件类型/格式分布等数据
+// @Tags admin
 // @Produce json
 // @Security SessionCookie
 // @Success 200 {object} util.ResponseAny{data=fileStatsResponse} "获取成功"
 // @Failure 401 {object} util.ResponseAny "未登录"
+// @Failure 403 {object} util.ResponseAny "无管理员权限"
 // @Failure 500 {object} util.ResponseAny "内部错误"
-// @Router /api/v1/upload/stats [get]
+// @Router /api/v1/admin/uploads/stats [get]
 func GetFileStats(c *gin.Context) {
-	currUser, _ := util.GetFromContext[*model.User](c, oauth.UserObjKey)
 	ctx := c.Request.Context()
-	userID := currUser.ID
 
 	// 1. 获取总文件数与总文件大小
 	var summary struct {
@@ -57,7 +55,7 @@ func GetFileStats(c *gin.Context) {
 	}
 	err := db.DB(ctx).Model(&model.Upload{}).
 		Select("COUNT(*) as total_count, COALESCE(SUM(file_size), 0) as total_size").
-		Where("user_id = ? AND status != ?", userID, model.UploadStatusDeleted).
+		Where("status != ?", model.UploadStatusDeleted).
 		Scan(&summary).Error
 	if err != nil {
 		c.JSON(http.StatusOK, util.Err(err.Error()))
@@ -73,7 +71,7 @@ func GetFileStats(c *gin.Context) {
 	var typeRaw []rawDist
 	err = db.DB(ctx).Model(&model.Upload{}).
 		Select("type as key, COUNT(*) as count, COALESCE(SUM(file_size), 0) as size").
-		Where("user_id = ? AND status != ?", userID, model.UploadStatusDeleted).
+		Where("status != ?", model.UploadStatusDeleted).
 		Group("type").
 		Scan(&typeRaw).Error
 	if err != nil {
@@ -103,7 +101,7 @@ func GetFileStats(c *gin.Context) {
 	var fileRaws []fileCategoryRaw
 	err = db.DB(ctx).Model(&model.Upload{}).
 		Select("extension, mime_type, file_size").
-		Where("user_id = ? AND status != ?", userID, model.UploadStatusDeleted).
+		Where("status != ?", model.UploadStatusDeleted).
 		Scan(&fileRaws).Error
 	if err != nil {
 		c.JSON(http.StatusOK, util.Err(err.Error()))
@@ -144,7 +142,7 @@ func GetFileStats(c *gin.Context) {
 	startTime := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -6)
 	err = db.DB(ctx).Model(&model.Upload{}).
 		Select("created_at, file_size").
-		Where("user_id = ? AND status != ? AND created_at >= ?", userID, model.UploadStatusDeleted, startTime).
+		Where("status != ? AND created_at >= ?", model.UploadStatusDeleted, startTime).
 		Scan(&trendRaws).Error
 	if err != nil {
 		c.JSON(http.StatusOK, util.Err(err.Error()))

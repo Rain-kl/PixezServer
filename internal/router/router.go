@@ -214,11 +214,6 @@ func registerRoutes(r *gin.Engine) {
 			uploadRouter.Use(oauth.LoginRequired())
 			{
 				uploadRouter.POST("", upload.UploadFile)
-				uploadRouter.GET("/my", upload.ListMyFiles)
-				uploadRouter.GET("/stats", upload.GetFileStats)
-				uploadRouter.DELETE("/:id", upload.DeleteFile)
-				uploadRouter.GET("/download/:id", upload.DownloadFile)
-				uploadRouter.POST("/download/batch", upload.BatchDownloadFiles)
 			}
 
 			// Config (public)
@@ -282,7 +277,15 @@ func registerRoutes(r *gin.Engine) {
 				adminRouter.DELETE("/users/:id", admin_user.DeleteUser)
 
 				// Uploads
-				adminRouter.GET("/uploads/types", upload.GetDistinctUploadTypes)
+				adminUploadsRouter := adminRouter.Group("/uploads")
+				{
+					adminUploadsRouter.GET("", upload.ListFiles)
+					adminUploadsRouter.GET("/stats", upload.GetFileStats)
+					adminUploadsRouter.DELETE("/:id", upload.DeleteFile)
+					adminUploadsRouter.GET("/download/:id", upload.DownloadFile)
+					adminUploadsRouter.POST("/download/batch", upload.BatchDownloadFiles)
+					adminUploadsRouter.GET("/types", upload.GetDistinctUploadTypes)
+				}
 
 				// System Config
 				adminRouter.POST("/system-configs", system_config.CreateSystemConfig)

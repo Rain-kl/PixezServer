@@ -77,8 +77,8 @@ const data = {
   ],
   admin: [
     { title: "用户管理", url: "/admin/users", icon: UserRound },
-    { title: "文件管理", url: "/admin/files", icon: FolderOpen },
     { title: "任务管理", url: "/admin/tasks", icon: Layers },
+    { title: "存储管理", url: "/admin/files", icon: FolderOpen },
     { title: "数据管理", url: "/admin/database", icon: Database },
     { title: "系统日志", url: "/admin/logs", icon: Terminal },
     { title: "系统配置", url: "/admin/system", icon: ShieldCheck },

@@ -1,6 +1,7 @@
 import {BaseService} from '../core/base.service'
 import type {FileStatsResponse, ListUploadsResponse, Upload, UploadImageResponse} from './types'
 import type {InternalAxiosRequestConfig} from 'axios'
+import apiClient from '../core/api-client'
 
 export type ImageQuality = 'low' | 'medium' | 'high' | 'origin'
 
@@ -35,7 +36,7 @@ export function formatFileSize(bytes: number): string {
  * 处理文件上传相关的 API 请求
  */
 export class UploadService extends BaseService {
-  protected static readonly basePath = '/api/v1/upload'
+  protected static readonly basePath = '/api/v1/admin/uploads'
 
   /**
    * 通用文件上传
@@ -59,20 +60,21 @@ export class UploadService extends BaseService {
       formData.append('access_mode', String(accessMode))
     }
 
-    return this.post<Upload>('', formData, {
+    const response = await apiClient.post<{ data: Upload }>('/api/v1/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     } as InternalAxiosRequestConfig)
+    return response.data.data
   }
 
   /**
-   * 获取我的文件列表
+   * 获取文件列表
    * @param page - 页码（1-based）
    * @param pageSize - 每页数量
    * @param keyword - 搜索关键词（文件名模糊）
    * @param type - 业务分类过滤
    * @param extension - 扩展名过滤
    */
-  static async listMyFiles(
+  static async listUploads(
     page = 1,
     pageSize = 20,
     keyword?: string,
@@ -83,7 +85,7 @@ export class UploadService extends BaseService {
     if (keyword) params.keyword = keyword
     if (type) params.type = type
     if (extension) params.extension = extension
-    return this.get<ListUploadsResponse>('/my', params)
+    return this.get<ListUploadsResponse>('', params)
   }
 
   /**
@@ -104,7 +106,7 @@ export class UploadService extends BaseService {
    * 获取单文件下载 URL（触发 attachment 下载）
    */
   static getDownloadUrl(id: string): string {
-    return `/api/v1/upload/download/${id}`
+    return `/api/v1/admin/uploads/download/${id}`
   }
 
   /**

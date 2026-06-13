@@ -189,7 +189,7 @@ func UploadFile(c *gin.Context) {
 // DownloadFile 通用单文件下载接口
 // @Summary 下载单文件
 // @Description 根据文件 ID 获取文件，以附件形式 (Attachment) 强制开启客户端浏览器下载
-// @Tags upload
+// @Tags admin
 // @Produce octet-stream
 // @Param id path string true "文件 ID"
 // @Param quality query string false "图片质量 (low, medium, high, origin)，默认为 origin"
@@ -198,7 +198,7 @@ func UploadFile(c *gin.Context) {
 // @Failure 400 {object} util.ResponseAny "参数错误"
 // @Failure 404 {object} util.ResponseAny "文件不存在"
 // @Failure 500 {object} util.ResponseAny "服务内部错误"
-// @Router /api/v1/upload/download/{id} [get]
+// @Router /api/v1/admin/uploads/download/{id} [get]
 func DownloadFile(c *gin.Context) {
 	upload, err := getUploadRecordByID(c)
 	if err != nil {
@@ -241,15 +241,15 @@ func DownloadFile(c *gin.Context) {
 // BatchDownloadFiles 批量打包 ZIP 下载接口
 // @Summary 批量打包下载
 // @Description 传入多个文件 ID，后台实时将其打包压缩为 ZIP 流并输出，自动处理文件名重复冲突
-// @Tags upload
+// @Tags admin
 // @Accept json
 // @Produce octet-stream
-// @Param request body upload.batchDownloadRequest true "包含文件 ID 数组的请求体"
+// @Param request body upload.batchDownloadRequest true "包含文件 ID 数组 of string 的请求体"
 // @Security SessionCookie
 // @Success 200 {file} file "成功下载打包后的 ZIP"
 // @Failure 400 {object} util.ResponseAny "参数错误"
 // @Failure 500 {object} util.ResponseAny "打包失败"
-// @Router /api/v1/upload/download/batch [post]
+// @Router /api/v1/admin/uploads/download/batch [post]
 func BatchDownloadFiles(c *gin.Context) {
 	ctx := c.Request.Context()
 

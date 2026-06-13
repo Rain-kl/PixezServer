@@ -247,66 +247,78 @@ export function StorageConfigTab() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database />
-            文件存储
-          </CardTitle>
-          <CardDescription>
-            默认使用本地存储。切换存储类型且已有文件时，系统会自动进入维护模式并迁移文件。
-          </CardDescription>
+      <Card className="border border-dashed shadow-sm">
+        <CardHeader className="border-b border-dashed pb-4">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-indigo-500/10 p-1.5 text-indigo-500">
+              <Database className="size-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold">文件存储</CardTitle>
+              <CardDescription className="text-xs">
+                默认使用本地存储。配置系统文件的存储媒介，切换存储类型且已有文件时，系统会自动进入维护模式并迁移文件。
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          <FieldGroup>
-            <Field>
-              <FieldLabel>存储类型</FieldLabel>
-              <Select
-                value={config.driver}
-                disabled={isFormDisabled}
-                onValueChange={(value) => setConfig({...config, driver: value as StorageDriver})}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {(Object.keys(driverLabels) as StorageDriver[]).map((driver) => (
-                      <SelectItem key={driver} value={driver}>{driverLabels[driver]}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
+        <CardContent className="pt-6">
+          <FieldGroup className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field className="flex flex-col gap-1.5 md:col-span-2">
+                <FieldLabel className="text-xs font-semibold">存储类型</FieldLabel>
+                <Select
+                  value={config.driver}
+                  disabled={isFormDisabled}
+                  onValueChange={(value) => setConfig({...config, driver: value as StorageDriver})}
+                >
+                  <SelectTrigger className="w-full border-dashed bg-card text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {(Object.keys(driverLabels) as StorageDriver[]).map((driver) => (
+                        <SelectItem key={driver} value={driver}>{driverLabels[driver]}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            {config.driver === "local" && (
-              <TextField
-                label="根目录"
-                value={config.local.root}
-                placeholder="."
-                onChange={(root) => setConfig({...config, local: {root}})}
-              />
-            )}
+              {config.driver === "local" && (
+                <div className="md:col-span-2">
+                  <TextField
+                    label="根目录"
+                    value={config.local.root}
+                    placeholder="."
+                    onChange={(root) => setConfig({...config, local: {root}})}
+                  />
+                </div>
+              )}
 
-            {(config.driver === "s3" || config.driver === "r2" || config.driver === "minio" || config.driver === "oss") && (
-              <ObjectFields
-                driver={config.driver as "s3" | "r2" | "minio" | "oss"}
-                value={config[config.driver as "s3" | "r2" | "minio" | "oss"]}
-                onChange={(patch) => updateObject(config.driver as "s3" | "r2" | "minio" | "oss", patch)}
-              />
-            )}
+              {(config.driver === "s3" || config.driver === "r2" || config.driver === "minio" || config.driver === "oss") && (
+                <ObjectFields
+                  driver={config.driver as "s3" | "r2" | "minio" | "oss"}
+                  value={config[config.driver as "s3" | "r2" | "minio" | "oss"]}
+                  onChange={(patch) => updateObject(config.driver as "s3" | "r2" | "minio" | "oss", patch)}
+                />
+              )}
 
-            {config.driver === "webdav" && (
-              <>
-                <TextField label="服务地址" value={config.webdav.endpoint} placeholder="https://dav.example.com" onChange={(endpoint) => setConfig({...config, webdav: {...config.webdav, endpoint}})} />
-                <TextField label="用户名" value={config.webdav.username} onChange={(username) => setConfig({...config, webdav: {...config.webdav, username}})} />
-                <TextField label="密码" type="password" value={config.webdav.password} onChange={(password) => setConfig({...config, webdav: {...config.webdav, password}})} />
-                <TextField label="基础路径" value={config.webdav.base_path} placeholder="wavelet" onChange={(base_path) => setConfig({...config, webdav: {...config.webdav, base_path}})} />
-              </>
-            )}
+              {config.driver === "webdav" && (
+                <>
+                  <div className="md:col-span-2">
+                    <TextField label="服务地址" value={config.webdav.endpoint} placeholder="https://dav.example.com" onChange={(endpoint) => setConfig({...config, webdav: {...config.webdav, endpoint}})} />
+                  </div>
+                  <TextField label="用户名" value={config.webdav.username} onChange={(username) => setConfig({...config, webdav: {...config.webdav, username}})} />
+                  <TextField label="密码" type="password" value={config.webdav.password} onChange={(password) => setConfig({...config, webdav: {...config.webdav, password}})} />
+                  <div className="md:col-span-2">
+                    <TextField label="基础路径" value={config.webdav.base_path} placeholder="wavelet" onChange={(base_path) => setConfig({...config, webdav: {...config.webdav, base_path}})} />
+                  </div>
+                </>
+              )}
+            </div>
           </FieldGroup>
         </CardContent>
-        <CardFooter className="justify-end gap-2 flex-col sm:flex-row items-end sm:items-center">
+        <CardFooter className="justify-end gap-2 flex-col sm:flex-row items-end sm:items-center border-t border-dashed pt-4 mt-6">
           {config.driver !== query.data?.config.driver && (
             <span className="text-xs text-amber-500 mr-auto text-left max-w-md">
               ⚠️ 您已切换存储类型。请先点击“保存配置”保存各存储端的配置凭据，然后点击“开始迁移”手动执行文件迁移。
@@ -317,6 +329,7 @@ export function StorageConfigTab() {
               variant="outline"
               disabled={isFormDisabled}
               onClick={() => saveMutation.mutate(config)}
+              className="border-dashed"
             >
               {saveMutation.isPending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Save data-icon="inline-start" />}
               保存配置
@@ -348,8 +361,16 @@ function ObjectFields({
 }) {
   return (
     <>
-      {driver === "r2" && <TextField label="Account ID" value={value.account_id || ""} onChange={(account_id) => onChange({account_id})} />}
-      {driver !== "s3" && <TextField label="Endpoint" value={value.endpoint} placeholder="https://..." onChange={(endpoint) => onChange({endpoint})} />}
+      {driver === "r2" && (
+        <div className="md:col-span-2">
+          <TextField label="Account ID" value={value.account_id || ""} onChange={(account_id) => onChange({account_id})} />
+        </div>
+      )}
+      {driver !== "s3" && (
+        <div className="md:col-span-2">
+          <TextField label="Endpoint" value={value.endpoint} placeholder="https://..." onChange={(endpoint) => onChange({endpoint})} />
+        </div>
+      )}
       <TextField label="Region" value={value.region} onChange={(region) => onChange({region})} />
       <TextField label="Bucket" value={value.bucket} onChange={(bucket) => onChange({bucket})} />
       <TextField label="Access Key ID" value={value.access_key_id} onChange={(access_key_id) => onChange({access_key_id})} />
@@ -357,11 +378,15 @@ function ObjectFields({
       <TextField label="对象前缀" value={value.key_prefix} placeholder="uploads" onChange={(key_prefix) => onChange({key_prefix})} />
       <TextField label="CDN 地址" value={value.cdn_url} placeholder="https://cdn.example.com" onChange={(cdn_url) => onChange({cdn_url})} />
       {(driver === "s3" || driver === "minio") && (
-        <Field orientation="horizontal">
-          <FieldLabel>Path Style</FieldLabel>
-          <Switch checked={value.path_style} onCheckedChange={(path_style) => onChange({path_style})} />
-          <FieldDescription>MinIO 等自托管 S3 通常需要开启。</FieldDescription>
-        </Field>
+        <div className="md:col-span-2">
+          <Field orientation="horizontal" className="flex items-center justify-between border border-dashed rounded-lg p-4 bg-muted/30">
+            <div className="flex flex-col gap-0.5">
+              <FieldLabel className="text-xs font-semibold cursor-pointer">Path Style</FieldLabel>
+              <FieldDescription className="text-[11px] leading-relaxed text-muted-foreground">MinIO 等自托管 S3 通常需要开启。</FieldDescription>
+            </div>
+            <Switch checked={value.path_style} onCheckedChange={(path_style) => onChange({path_style})} />
+          </Field>
+        </div>
       )}
     </>
   )
@@ -381,9 +406,15 @@ function TextField({
   type?: React.HTMLInputTypeAttribute
 }) {
   return (
-    <Field>
-      <FieldLabel>{label}</FieldLabel>
-      <Input type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+    <Field className="flex flex-col gap-1.5">
+      <FieldLabel className="text-xs font-semibold">{label}</FieldLabel>
+      <Input
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="border-dashed bg-card text-xs"
+      />
     </Field>
   )
 }

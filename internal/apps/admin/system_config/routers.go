@@ -5,8 +5,10 @@
 package system_config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -199,6 +201,13 @@ func UpdateSystemConfig(c *gin.Context) {
 		if err := json.Unmarshal([]byte(config.Value), &currentCfg); err == nil {
 			originalDriver = currentCfg.Driver
 		}
+
+		validatedVal, err := validateAndMergeStorageConfig(c.Request.Context(), req.Value, config.Value)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, util.Err(err.Error()))
+			return
+		}
+		req.Value = validatedVal
 	}
 
 	if err := db.DB(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
@@ -337,4 +346,43 @@ func maskSensitiveConfig(key, value string) string {
 		}
 	}
 	return value
+}
+
+// validateAndMergeStorageConfig parses, merges unmasked secrets, validates parameter values,
+// and tests connectivity of the new storage configuration.
+func validateAndMergeStorageConfig(ctx context.Context, value string, currentConfig string) (string, error) {
+	var currentCfg storage.Config
+	if err := json.Unmarshal([]byte(currentConfig), &currentCfg); err != nil {
+		return "", fmt.Errorf("解析当前存储配置失败: %w", err)
+	}
+
+	var newCfg storage.Config
+	if err := json.Unmarshal([]byte(value), &newCfg); err != nil {
+		return "", fmt.Errorf("解析目标存储配置失败: %w", err)
+	}
+
+	// 合并被掩码屏蔽的敏感信息，获取完整的真实配置
+	targetCfg := storage.MergeMaskedSecrets(newCfg, currentCfg)
+
+	// 校验配置参数是否合法
+	if err := storage.ValidateConfig(targetCfg); err != nil {
+		return "", fmt.Errorf("验证存储配置参数失败: %w", err)
+	}
+
+	// 进行连通性测试验证，如果测试失败则拒绝保存
+	testBackend, err := storage.NewBackend(ctx, targetCfg, targetCfg.Driver)
+	if err != nil {
+		return "", fmt.Errorf("初始化测试存储实例失败: %w", err)
+	}
+	if err := testBackend.Test(ctx); err != nil {
+		return "", fmt.Errorf("存储连通性测试失败: %w", err)
+	}
+
+	// 序列化为最终保存的真实明文配置，防止保存屏蔽的 ****** 字符
+	unmaskedVal, err := json.Marshal(targetCfg)
+	if err != nil {
+		return "", fmt.Errorf("序列化存储配置失败: %w", err)
+	}
+
+	return string(unmaskedVal), nil
 }

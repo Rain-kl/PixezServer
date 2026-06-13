@@ -80,8 +80,8 @@ export function FileList() {
 
   // 文件列表查询
   const listQuery = useQuery({
-    queryKey: ["files", "my", page, pageSize, debouncedKeyword],
-    queryFn: () => UploadService.listMyFiles(page, pageSize, debouncedKeyword || undefined),
+    queryKey: ["files", "all", page, pageSize, debouncedKeyword],
+    queryFn: () => UploadService.listUploads(page, pageSize, debouncedKeyword || undefined),
   })
 
   const files = listQuery.data?.items ?? []
