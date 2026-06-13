@@ -179,8 +179,20 @@ func registerRoutes(r *gin.Engine) {
 					}
 					return enabled
 				}), user.Login)
-				userRouter.POST("/register", user.Register)
-				userRouter.POST("/send-email-code", user.SendEmailCode)
+				userRouter.POST("/register", capApp.VerifyMiddleware(capUtil.GetDefaultManager(), "register", func() bool {
+					enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
+					if err != nil {
+						return false
+					}
+					return enabled
+				}), user.Register)
+				userRouter.POST("/send-email-code", capApp.VerifyMiddleware(capUtil.GetDefaultManager(), "send_email_code", func() bool {
+					enabled, err := model.GetBoolByKey(context.Background(), model.ConfigKeyCapLoginEnabled)
+					if err != nil {
+						return false
+					}
+					return enabled
+				}), user.SendEmailCode)
 				userRouter.GET("/logout", user.Logout)
 				userRouter.GET("/self", oauth.LoginRequired(), oauth.UserInfo)
 				userRouter.POST("/change-password", oauth.LoginRequired(), user.ChangePassword)
@@ -203,6 +215,7 @@ func registerRoutes(r *gin.Engine) {
 			{
 				uploadRouter.POST("", upload.UploadFile)
 				uploadRouter.GET("/my", upload.ListMyFiles)
+				uploadRouter.GET("/stats", upload.GetFileStats)
 				uploadRouter.DELETE("/:id", upload.DeleteFile)
 				uploadRouter.GET("/download/:id", upload.DownloadFile)
 				uploadRouter.POST("/download/batch", upload.BatchDownloadFiles)

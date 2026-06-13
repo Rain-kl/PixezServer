@@ -1,5 +1,5 @@
 import {BaseService} from '../core/base.service'
-import type {ListUploadsResponse, Upload, UploadImageResponse} from './types'
+import type {FileStatsResponse, ListUploadsResponse, Upload, UploadImageResponse} from './types'
 import type {InternalAxiosRequestConfig} from 'axios'
 
 export type ImageQuality = 'low' | 'medium' | 'high' | 'origin'
@@ -84,6 +84,13 @@ export class UploadService extends BaseService {
     if (type) params.type = type
     if (extension) params.extension = extension
     return this.get<ListUploadsResponse>('/my', params)
+  }
+
+  /**
+   * 获取当前用户文件统计信息
+   */
+  static async getFileStats(): Promise<FileStatsResponse> {
+    return this.get<FileStatsResponse>('/stats')
   }
 
   /**

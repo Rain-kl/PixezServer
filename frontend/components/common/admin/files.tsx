@@ -4,26 +4,44 @@ import * as React from "react"
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query"
 import {AnimatePresence, motion} from "motion/react"
 import {
+  Database,
   Download,
   Eye,
   FileArchive,
   FileAudio,
   FileImage,
+  Files,
   FileText,
   FileVideo,
+  HardDrive,
+  Info,
   Loader2,
   Search,
   Trash2,
+  TrendingUp,
   Upload,
   X,
 } from "lucide-react"
 import {toast} from "sonner"
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 
 import {Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
 import {Badge} from "@/components/ui/badge"
 import {Checkbox} from "@/components/ui/checkbox"
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table"
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +52,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,} from "@/components/ui/sheet"
+import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle} from "@/components/ui/sheet"
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card"
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs"
 import {formatFileSize, getFileUrl, UploadService} from "@/lib/services/upload/upload.service"
 import type {Upload as UploadRecord} from "@/lib/services/upload/types"
 
@@ -59,10 +79,20 @@ function formatDate(dateStr: string) {
   })
 }
 
+const PIE_COLORS = [
+  "#3b82f6", // Blue (图片)
+  "#10b981", // Emerald (视频)
+  "#8b5cf6", // Purple (音频)
+  "#f59e0b", // Amber (文档)
+  "#ec4899", // Pink (压缩包)
+  "#64748b", // Slate (其他)
+]
+
 /* ─── 文件管理主组件 ────────────────────────────────────── */
 
 export function FilesMain() {
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = React.useState("stats")
   const [keyword, setKeyword] = React.useState("")
   const [debouncedKeyword, setDebouncedKeyword] = React.useState("")
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
@@ -70,6 +100,9 @@ export function FilesMain() {
   const [detailTarget, setDetailTarget] = React.useState<UploadRecord | null>(null)
   const [page, setPage] = React.useState(1)
   const pageSize = 15 // 表格视图下 15 条更紧凑
+
+  // 趋势图指标类型切换 (数量 vs 大小)
+  const [trendMetric, setTrendMetric] = React.useState<"count" | "size">("count")
 
   // 搜索防抖
   React.useEffect(() => {
@@ -84,6 +117,14 @@ export function FilesMain() {
   const listQuery = useQuery({
     queryKey: ["files", "my", page, pageSize, debouncedKeyword],
     queryFn: () => UploadService.listMyFiles(page, pageSize, debouncedKeyword || undefined),
+    enabled: activeTab === "list",
+  })
+
+  // 统计信息查询
+  const statsQuery = useQuery({
+    queryKey: ["files", "stats"],
+    queryFn: () => UploadService.getFileStats(),
+    enabled: activeTab === "stats",
   })
 
   const files = listQuery.data?.items ?? []
@@ -114,6 +155,7 @@ export function FilesMain() {
     mutationFn: (id: string) => UploadService.deleteFile(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["files", "my"] })
+      void queryClient.invalidateQueries({ queryKey: ["files", "stats"] })
       toast.success("文件已删除")
       setDeleteTarget(null)
     },
@@ -159,6 +201,67 @@ export function FilesMain() {
     a.click()
   }
 
+  // ─── 数据处理 ───
+  const stats = statsQuery.data
+  const trendData = React.useMemo(() => {
+    if (!stats?.trend) return []
+    return stats.trend.map((item) => ({
+      ...item,
+      formattedDate: item.date.substring(5), // YYYY-MM-DD -> MM-DD
+      value: trendMetric === "count" ? item.count : item.size,
+    }))
+  }, [stats?.trend, trendMetric])
+
+  const categoryCountData = React.useMemo(() => {
+    if (!stats?.categories) return []
+    return stats.categories
+      .filter((c) => c.count > 0)
+      .map((c) => ({ name: c.name, value: c.count }))
+  }, [stats?.categories])
+
+  const categorySizeData = React.useMemo(() => {
+    if (!stats?.categories) return []
+    return stats.categories
+      .filter((c) => c.size > 0)
+      .map((c) => ({ name: c.name, value: c.size }))
+  }, [stats?.categories])
+
+  // 计算最大占用与最大数量文件类型
+  const maxStats = React.useMemo(() => {
+    if (!stats?.categories || stats.categories.length === 0) {
+      return { maxCountName: "无", maxCount: 0, maxSizeName: "无", maxSize: 0 }
+    }
+    let maxCountName = "无"
+    let maxCount = 0
+    let maxSizeName = "无"
+    let maxSize = 0
+
+    stats.categories.forEach((cat) => {
+      if (cat.count > maxCount) {
+        maxCount = cat.count
+        maxCountName = cat.name
+      }
+      if (cat.size > maxSize) {
+        maxSize = cat.size
+        maxSizeName = cat.name
+      }
+    })
+
+    return { maxCountName, maxCount, maxSizeName, maxSize }
+  }, [stats?.categories])
+
+  // 近 7 天趋势总新增统计
+  const trendSummary = React.useMemo(() => {
+    if (!stats?.trend) return { count: 0, size: 0 }
+    return stats.trend.reduce(
+      (acc, curr) => ({
+        count: acc.count + curr.count,
+        size: acc.size + curr.size,
+      }),
+      { count: 0, size: 0 }
+    )
+  }, [stats?.trend])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -166,262 +269,572 @@ export function FilesMain() {
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="py-6 space-y-6 w-full"
     >
-
-      {/* 头部 */}
+      {/* 顶部标题区 */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text text-transparent">
-              文件管理
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              管理您上传的所有文件，支持下载与批量操作
-            </p>
-          </div>
-        </div>
-
-        {/* 操作按钮区 */}
-        <div className="flex items-center gap-2 shrink-0">
-          <AnimatePresence>
-            {selectedIds.size > 0 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="flex items-center gap-2"
-              >
-                <Badge variant="secondary" className="text-xs px-2.5">
-                  已选 {selectedIds.size} 个
-                </Badge>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-dashed text-xs h-8"
-                  onClick={() => batchDownloadMutation.mutate([...selectedIds])}
-                  disabled={batchDownloadMutation.isPending}
-                >
-                  {batchDownloadMutation.isPending ? (
-                    <Loader2 className="size-3.5 mr-1 animate-spin" />
-                  ) : (
-                    <FileArchive className="size-3.5 mr-1" />
-                  )}
-                  打包下载
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-xs h-8 px-2"
-                  onClick={clearSelection}
-                >
-                  <X className="size-3.5" />
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* 搜索栏 */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <Input
-            placeholder="搜索文件名..."
-            className="pl-8 h-8 text-xs border-dashed rounded-lg focus-visible:ring-0"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-          />
-          {keyword && (
-            <button
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              onClick={() => setKeyword("")}
-            >
-              <X className="size-3" />
-            </button>
-          )}
-        </div>
-        {files.length > 0 && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-xs h-8 border border-dashed text-muted-foreground"
-            onClick={selectedIds.size === files.length ? clearSelection : selectAll}
-          >
-            {selectedIds.size === files.length ? "取消全选" : "全选本页"}
-          </Button>
-        )}
-        {total > 0 && (
-          <span className="text-xs text-muted-foreground shrink-0">共 {total} 个文件</span>
-        )}
-      </div>
-
-      {/* 文件列表 Table */}
-      {listQuery.isPending ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="size-6 animate-spin text-sky-500" />
-        </div>
-      ) : files.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-muted-foreground">
-          <Upload className="size-12 text-muted-foreground/30" />
-          <p className="text-sm">
-            {debouncedKeyword ? "没有匹配的文件" : "您还没有上传任何文件"}
+        <div>
+          <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text text-transparent">
+            文件管理
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            管理您上传的所有文件，支持下载、数据统计与批量操作
           </p>
         </div>
-      ) : (
-        <div className="border border-dashed rounded-xl bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent border-dashed">
-                <TableHead className="w-[50px] pl-4 py-3">
-                  <Checkbox
-                    checked={isAllSelected || (isSomeSelected ? "indeterminate" : false)}
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
-                <TableHead className="w-[80px] py-3">预览</TableHead>
-                <TableHead className="w-[180px] py-3">ID</TableHead>
-                <TableHead className="py-3">文件名</TableHead>
-                <TableHead className="max-w-[200px] truncate py-3">路径</TableHead>
-                <TableHead className="w-[100px] py-3">业务类别</TableHead>
-                <TableHead className="w-[100px] py-3">访问模式</TableHead>
-                <TableHead className="w-[125px] py-3">MIME类型</TableHead>
-                <TableHead className="w-[100px] py-3">大小</TableHead>
-                <TableHead className="w-[150px] py-3">上传时间</TableHead>
-                <TableHead className="w-[120px] text-right pr-4 py-3">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {files.map((file) => {
-                const isSelected = selectedIds.has(file.id)
-                return (
-                  <TableRow
-                    key={file.id}
-                    className={`border-dashed hover:bg-muted/30 transition-colors ${
-                      isSelected ? "bg-sky-500/5 hover:bg-sky-500/10" : ""
-                    }`}
-                  >
-                    <TableCell className="pl-4 py-3">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleSelect(file.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex items-center justify-center size-9 rounded-lg bg-muted/40 overflow-hidden border">
-                        {file.mime_type.startsWith("image/") ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={getFileUrl(file.id, "low") ?? undefined}
-                            alt={file.file_name}
-                            className="size-full object-cover"
-                            onError={(e) => {
-                              ;(e.currentTarget as HTMLImageElement).style.display = "none"
-                            }}
-                          />
-                        ) : (
-                          getFileIcon(file.mime_type, "size-4.5")
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3 font-mono text-[11px] text-muted-foreground select-all">
-                      {file.id}
-                    </TableCell>
-                    <TableCell className="py-3 font-medium max-w-[180px] truncate text-xs" title={file.file_name}>
-                      {file.file_name}
-                    </TableCell>
-                    <TableCell className="py-3 font-mono text-[11px] max-w-[200px] truncate text-muted-foreground select-all" title={file.file_path}>
-                      {file.file_path}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-normal rounded-md">
-                        {file.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      {file.access_mode === 1 ? (
-                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal rounded-md text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/30 dark:border-emerald-900/30">
-                          公开
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal rounded-md text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-900/30">
-                          私有
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-3 text-[11px] text-muted-foreground truncate max-w-[125px]" title={file.mime_type}>
-                      {file.mime_type}
-                    </TableCell>
-                    <TableCell className="py-3 text-xs">
-                      {formatFileSize(file.file_size)}
-                    </TableCell>
-                    <TableCell className="py-3 text-xs text-muted-foreground">
-                      {formatDate(file.created_at)}
-                    </TableCell>
-                    <TableCell className="py-3 text-right pr-4">
-                      <div className="flex items-center justify-end gap-0.5">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-                          title="查看详情"
-                          onClick={() => setDetailTarget(file)}
-                        >
-                          <Eye className="size-3.5" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 rounded-md hover:bg-muted"
-                          title="下载"
-                          onClick={() => handleDownload(file)}
-                        >
-                          <Download className="size-3.5" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                          title="删除"
-                          onClick={() => setDeleteTarget(file)}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      </div>
 
-      {/* 分页 */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-dashed text-xs h-7 px-3"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            上一页
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            {page} / {totalPages}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-dashed text-xs h-7 px-3"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            下一页
-          </Button>
-        </div>
-      )}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
+        <TabsList className="grid w-fit grid-cols-2">
+          <TabsTrigger value="stats">文件存储信息</TabsTrigger>
+          <TabsTrigger value="list">文件列表</TabsTrigger>
+        </TabsList>
+
+        {/* ──────── TAB 1: 统计看板 ──────── */}
+        <TabsContent value="stats" className="space-y-6 outline-hidden">
+          {statsQuery.isPending ? (
+            <div className="flex items-center justify-center py-32">
+              <Loader2 className="size-8 animate-spin text-sky-500" />
+            </div>
+          ) : !stats || stats.total_count === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 border border-dashed rounded-xl bg-card text-muted-foreground gap-4">
+              <Upload className="size-14 text-muted-foreground/25" />
+              <div className="text-center space-y-1">
+                <p className="font-medium">暂无上传数据</p>
+                <p className="text-xs text-muted-foreground">上传文件后即可在此查看容量与文件分布分析。</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* 四个指标卡片 */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Card className="bg-card/25 border-border/40 hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-xs font-semibold tracking-tight text-muted-foreground">总文件数</CardTitle>
+                    <Files className="size-4 text-sky-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold font-mono text-sky-500">{stats.total_count.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">个</span></div>
+                    <p className="text-[10px] text-muted-foreground mt-1">您上传的可用文件数量汇总</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card/25 border-border/40 hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-xs font-semibold tracking-tight text-muted-foreground">占用存储容量</CardTitle>
+                    <Database className="size-4 text-emerald-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold font-mono text-emerald-500">{formatFileSize(stats.total_size)}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">文件实际在磁盘/S3中占用的总空间</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card/25 border-border/40 hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-xs font-semibold tracking-tight text-muted-foreground">近 7 天新增文件</CardTitle>
+                    <TrendingUp className="size-4 text-indigo-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold font-mono text-indigo-500">+{trendSummary.count.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">个</span></div>
+                    <p className="text-[10px] text-muted-foreground mt-1">最近 7 天上传成功的文件总数</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card/25 border-border/40 hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-xs font-semibold tracking-tight text-muted-foreground">近 7 天新增大小</CardTitle>
+                    <HardDrive className="size-4 text-amber-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold font-mono text-amber-500">+{formatFileSize(trendSummary.size)}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">最近 7 天上传所消耗的存储带宽</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* 7 天新增趋势折线图 */}
+              <Card className="bg-card/20 border-border/40">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold">最近 7 天新增趋势</CardTitle>
+                    <CardDescription className="text-xs">按日统计近一周期内的上传波动</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-muted/30">
+                    <Button
+                      size="sm"
+                      variant={trendMetric === "count" ? "secondary" : "ghost"}
+                      className="h-7 text-xs px-2.5 rounded-md"
+                      onClick={() => setTrendMetric("count")}
+                    >
+                      新增数量 (个)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={trendMetric === "size" ? "secondary" : "ghost"}
+                      className="h-7 text-xs px-2.5 rounded-md"
+                      onClick={() => setTrendMetric("size")}
+                    >
+                      新增大小 (MB)
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pl-2 pr-4 pt-2">
+                  <div className="h-[280px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
+                            <stop
+                              offset="5%"
+                              stopColor={trendMetric === "count" ? "#6366f1" : "#10b981"}
+                              stopOpacity={0.3}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor={trendMetric === "count" ? "#6366f1" : "#10b981"}
+                              stopOpacity={0.01}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border)/40)" />
+                        <XAxis
+                          dataKey="formattedDate"
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          style={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                        />
+                        <YAxis
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          style={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                          tickFormatter={(v) => (trendMetric === "size" ? formatFileSize(v) : v.toString())}
+                        />
+                        <RechartsTooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0]
+                              return (
+                                <div className="bg-background/95 backdrop-blur-sm border border-border/50 rounded-lg p-2.5 shadow-xl text-xs space-y-1">
+                                  <p className="text-[10px] text-muted-foreground font-medium">{data.payload.date}</p>
+                                  <div className="flex items-center gap-2">
+                                    <span className="size-2 rounded-full" style={{ backgroundColor: data.color }} />
+                                    <span className="font-medium text-foreground">
+                                      {trendMetric === "count" ? "新增文件数: " : "新增大小: "}
+                                      <span className="font-mono font-semibold text-foreground/90">
+                                        {trendMetric === "count" ? `${data.value} 个` : formatFileSize(data.value as number)}
+                                      </span>
+                                    </span>
+                                  </div>
+                                </div>
+                              )
+                            }
+                            return null
+                          }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="value"
+                          stroke={trendMetric === "count" ? "#6366f1" : "#10b981"}
+                          strokeWidth={2.5}
+                          fillOpacity={1}
+                          fill="url(#colorTrend)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 两个饼图分布 */}
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* 饼图 1: 格式数量分布 */}
+                <Card className="bg-card/20 border-border/40 flex flex-col">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-bold">文件格式数量分布</CardTitle>
+                    <CardDescription className="text-xs">各种格式类型的文件个数占比</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col justify-between gap-4">
+                    {categoryCountData.length === 0 ? (
+                      <div className="h-[240px] flex items-center justify-center text-xs text-muted-foreground">暂无分类数据</div>
+                    ) : (
+                      <div className="h-[240px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={categoryCountData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={3}
+                              dataKey="value"
+                            >
+                              {categoryCountData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <RechartsTooltip
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload
+                                  return (
+                                    <div className="bg-background/95 backdrop-blur-sm border border-border/50 rounded-lg p-2 shadow-xl text-xs font-medium space-y-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="size-2 rounded-full" style={{ backgroundColor: payload[0].color }} />
+                                        <span className="text-muted-foreground">{data.name}</span>
+                                      </div>
+                                      <div className="font-mono text-foreground font-semibold pl-3">
+                                        {data.value} 个
+                                      </div>
+                                    </div>
+                                  )
+                                }
+                                return null
+                              }}
+                            />
+                            <Legend
+                              verticalAlign="bottom"
+                              height={36}
+                              content={({ payload }) => {
+                                if (!payload) return null
+                                return (
+                                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground pt-4">
+                                    {payload.map((entry: { value: string; color?: string }) => (
+                                      <div key={entry.value} className="flex items-center gap-1.5">
+                                        <span className="size-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                        <span>{entry.value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                    <div className="bg-sky-500/5 border border-sky-500/10 rounded-lg p-3 flex items-start gap-2.5 text-xs text-sky-600 dark:text-sky-400">
+                      <Info className="size-4 shrink-0 mt-0.5" />
+                      <p className="leading-normal">
+                        文件类型中数量最多的是 <strong className="font-bold">「{maxStats.maxCountName}」</strong>，累计上传了 <strong className="font-mono font-bold">{maxStats.maxCount}</strong> 个文件。
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 饼图 2: 格式容量分布 */}
+                <Card className="bg-card/20 border-border/40 flex flex-col">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-bold">文件占用容量分布</CardTitle>
+                    <CardDescription className="text-xs">各种格式类型的文件大小占比</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col justify-between gap-4">
+                    {categorySizeData.length === 0 ? (
+                      <div className="h-[240px] flex items-center justify-center text-xs text-muted-foreground">暂无容量数据</div>
+                    ) : (
+                      <div className="h-[240px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={categorySizeData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={3}
+                              dataKey="value"
+                            >
+                              {categorySizeData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <RechartsTooltip
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload
+                                  return (
+                                    <div className="bg-background/95 backdrop-blur-sm border border-border/50 rounded-lg p-2 shadow-xl text-xs font-medium space-y-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="size-2 rounded-full" style={{ backgroundColor: payload[0].color }} />
+                                        <span className="text-muted-foreground">{data.name}</span>
+                                      </div>
+                                      <div className="font-mono text-foreground font-semibold pl-3">
+                                        {formatFileSize(data.value)}
+                                      </div>
+                                    </div>
+                                  )
+                                }
+                                return null
+                              }}
+                            />
+                            <Legend
+                              verticalAlign="bottom"
+                              height={36}
+                              content={({ payload }) => {
+                                if (!payload) return null
+                                return (
+                                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground pt-4">
+                                    {payload.map((entry: { value: string; color?: string }) => (
+                                      <div key={entry.value} className="flex items-center gap-1.5">
+                                        <span className="size-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                        <span>{entry.value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                    <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3 flex items-start gap-2.5 text-xs text-emerald-600 dark:text-emerald-400">
+                      <Info className="size-4 shrink-0 mt-0.5" />
+                      <p className="leading-normal">
+                        文件类型中占用存储最大的是 <strong className="font-bold">「{maxStats.maxSizeName}」</strong>，共消耗了 <strong className="font-mono font-bold">{formatFileSize(maxStats.maxSize)}</strong> 存储容量。
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ──────── TAB 2: 文件列表 ──────── */}
+        <TabsContent value="list" className="space-y-6 outline-hidden">
+          {/* 搜索栏 */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Input
+                placeholder="搜索文件名..."
+                className="pl-8 h-8 text-xs border-dashed rounded-lg focus-visible:ring-0"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+              />
+              {keyword && (
+                <button
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setKeyword("")}
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+            {files.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs h-8 border border-dashed text-muted-foreground"
+                onClick={selectedIds.size === files.length ? clearSelection : selectAll}
+              >
+                {selectedIds.size === files.length ? "取消全选" : "全选本页"}
+              </Button>
+            )}
+
+            {/* 打包下载等批量操作 */}
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              <AnimatePresence>
+                {selectedIds.size > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="flex items-center gap-2"
+                  >
+                    <Badge variant="secondary" className="text-xs px-2.5">
+                      已选 {selectedIds.size} 个
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-dashed text-xs h-8"
+                      onClick={() => batchDownloadMutation.mutate([...selectedIds])}
+                      disabled={batchDownloadMutation.isPending}
+                    >
+                      {batchDownloadMutation.isPending ? (
+                        <Loader2 className="size-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <FileArchive className="size-3.5 mr-1" />
+                      )}
+                      打包下载
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs h-8 px-2"
+                      onClick={clearSelection}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {total > 0 && (
+              <span className="text-xs text-muted-foreground shrink-0">共 {total} 个文件</span>
+            )}
+          </div>
+
+          {/* 文件列表 Table */}
+          {listQuery.isPending ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="size-6 animate-spin text-sky-500" />
+            </div>
+          ) : files.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4 text-muted-foreground">
+              <Upload className="size-12 text-muted-foreground/30" />
+              <p className="text-sm">
+                {debouncedKeyword ? "没有匹配的文件" : "您还没有上传任何文件"}
+              </p>
+            </div>
+          ) : (
+            <div className="border border-dashed rounded-xl bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-dashed">
+                    <TableHead className="w-[50px] pl-4 py-3">
+                      <Checkbox
+                        checked={isAllSelected || (isSomeSelected ? "indeterminate" : false)}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead className="w-[80px] py-3">预览</TableHead>
+                    <TableHead className="w-[180px] py-3">ID</TableHead>
+                    <TableHead className="py-3">文件名</TableHead>
+                    <TableHead className="max-w-[200px] truncate py-3">路径</TableHead>
+                    <TableHead className="w-[100px] py-3">业务类别</TableHead>
+                    <TableHead className="w-[125px] py-3">MIME类型</TableHead>
+                    <TableHead className="w-[100px] py-3">大小</TableHead>
+                    <TableHead className="w-[150px] py-3">上传时间</TableHead>
+                    <TableHead className="w-[120px] text-right pr-4 py-3">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {files.map((file) => {
+                    const isSelected = selectedIds.has(file.id)
+                    return (
+                      <TableRow
+                        key={file.id}
+                        className={`border-dashed hover:bg-muted/30 transition-colors ${
+                          isSelected ? "bg-sky-500/5 hover:bg-sky-500/10" : ""
+                        }`}
+                      >
+                        <TableCell className="pl-4 py-3">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelect(file.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <div className="flex items-center justify-center size-9 rounded-lg bg-muted/40 overflow-hidden border">
+                            {file.mime_type.startsWith("image/") ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={getFileUrl(file.id, "low") ?? undefined}
+                                alt={file.file_name}
+                                className="size-full object-cover"
+                                onError={(e) => {
+                                  ;(e.currentTarget as HTMLImageElement).style.display = "none"
+                                }}
+                              />
+                            ) : (
+                              getFileIcon(file.mime_type, "size-4.5")
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3 font-mono text-[11px] text-muted-foreground select-all">
+                          {file.id}
+                        </TableCell>
+                        <TableCell className="py-3 font-medium max-w-[180px] truncate text-xs" title={file.file_name}>
+                          {file.file_name}
+                        </TableCell>
+                        <TableCell className="py-3 font-mono text-[11px] max-w-[200px] truncate text-muted-foreground select-all" title={file.file_path}>
+                          {file.file_path}
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-normal rounded-md">
+                            {file.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-3 text-[11px] text-muted-foreground truncate max-w-[125px]" title={file.mime_type}>
+                          {file.mime_type}
+                        </TableCell>
+                        <TableCell className="py-3 text-xs">
+                          {formatFileSize(file.file_size)}
+                        </TableCell>
+                        <TableCell className="py-3 text-xs text-muted-foreground">
+                          {formatDate(file.created_at)}
+                        </TableCell>
+                        <TableCell className="py-3 text-right pr-4">
+                          <div className="flex items-center justify-end gap-0.5">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                              title="查看详情"
+                              onClick={() => setDetailTarget(file)}
+                            >
+                              <Eye className="size-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 rounded-md hover:bg-muted"
+                              title="下载"
+                              onClick={() => handleDownload(file)}
+                            >
+                              <Download className="size-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                              title="删除"
+                              onClick={() => setDeleteTarget(file)}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* 分页 */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-dashed text-xs h-7 px-3"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                上一页
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {page} / {totalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-dashed text-xs h-7 px-3"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                下一页
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* 详情查看 Sheet */}
       <Sheet open={!!detailTarget} onOpenChange={(open) => !open && setDetailTarget(null)}>
@@ -497,21 +910,6 @@ export function FilesMain() {
                     <Badge variant="secondary" className="text-[10px] py-0 px-2 rounded-md font-normal">
                       {detailTarget.type}
                     </Badge>
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 border-b border-dashed pb-2">
-                  <span className="text-muted-foreground font-medium">访问模式</span>
-                  <span className="col-span-2">
-                    {detailTarget.access_mode === 1 ? (
-                      <Badge variant="outline" className="text-[10px] py-0 px-2 rounded-md font-normal text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/30 dark:border-emerald-900/30">
-                        公开
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] py-0 px-2 rounded-md font-normal text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-900/30">
-                        私有
-                      </Badge>
-                    )}
                   </span>
                 </div>
 

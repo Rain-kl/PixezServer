@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Rain-kl/Wavelet/internal/apps/oauth"
 	"github.com/Rain-kl/Wavelet/internal/db"
@@ -47,6 +48,7 @@ func setupTestRouter(authUser *model.User) *gin.Engine {
 
 	uploadGroup.POST("", UploadFile)
 	uploadGroup.GET("/my", ListMyFiles)
+	uploadGroup.GET("/stats", GetFileStats)
 	uploadGroup.GET("/download/:id", DownloadFile)
 	uploadGroup.POST("/download/batch", BatchDownloadFiles)
 	return r
@@ -707,5 +709,115 @@ func TestUploadAccessModeAccessControl(t *testing.T) {
 	routerUser2.ServeHTTP(wAccessPublic, reqAccessPublic)
 	if wAccessPublic.Code != http.StatusOK {
 		t.Errorf("any logged-in user should be allowed to download public file, got status %d", wAccessPublic.Code)
+	}
+}
+
+func TestGetFileStats(t *testing.T) {
+	dbConn, _, cleanup := testhelper.SetupTestEnvironment(t)
+	defer cleanup()
+
+	authUser := &model.User{ID: 1001, Username: "test_user"}
+	router := setupTestRouter(authUser)
+
+	// Insert some dummy uploads
+	uploads := []model.Upload{
+		{
+			ID:            3101,
+			UserID:        authUser.ID,
+			FileName:      "photo.png",
+			FilePath:      "uploads/photo.png",
+			FileSize:      100,
+			MimeType:      "image/png",
+			Extension:     "png",
+			StorageDriver: "local",
+			Type:          "generic",
+			Status:        model.UploadStatusUsed,
+			CreatedAt:     time.Now(),
+		},
+		{
+			ID:            3102,
+			UserID:        authUser.ID,
+			FileName:      "video.mp4",
+			FilePath:      "uploads/video.mp4",
+			FileSize:      500,
+			MimeType:      "video/mp4",
+			Extension:     "mp4",
+			StorageDriver: "local",
+			Type:          "generic",
+			Status:        model.UploadStatusUsed,
+			CreatedAt:     time.Now().AddDate(0, 0, -2), // 2 days ago
+		},
+		{
+			ID:            3103,
+			UserID:        authUser.ID,
+			FileName:      "document.pdf",
+			FilePath:      "uploads/document.pdf",
+			FileSize:      200,
+			MimeType:      "application/pdf",
+			Extension:     "pdf",
+			StorageDriver: "local",
+			Type:          "avatar", // different type
+			Status:        model.UploadStatusUsed,
+			CreatedAt:     time.Now().AddDate(0, 0, -10), // older than 7 days
+		},
+	}
+
+	for i := range uploads {
+		if err := dbConn.Create(&uploads[i]).Error; err != nil {
+			t.Fatalf("failed to create upload: %v", err)
+		}
+	}
+
+	req, _ := http.NewRequest("GET", "/api/v1/upload/stats", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		ErrorMsg string            `json:"error_msg"`
+		Data     fileStatsResponse `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if resp.ErrorMsg != "" {
+		t.Fatalf("expected no error, got: %s", resp.ErrorMsg)
+	}
+
+	// Verify total count and size
+	if resp.Data.TotalCount != 3 {
+		t.Errorf("expected 3 total files, got %d", resp.Data.TotalCount)
+	}
+	if resp.Data.TotalSize != 800 {
+		t.Errorf("expected 800 total size, got %d", resp.Data.TotalSize)
+	}
+
+	// Verify trend (last 7 days should include photo.png (100) and video.mp4 (500), but NOT pdf (older))
+	// Total size in trend should be 600
+	var trendSizeSum int64
+	for _, trendItem := range resp.Data.Trend {
+		trendSizeSum += trendItem.Size
+	}
+	if trendSizeSum != 600 {
+		t.Errorf("expected 7-day trend size sum to be 600, got %d", trendSizeSum)
+	}
+
+	// Verify categories
+	categoryMap := make(map[string]int64)
+	for _, cat := range resp.Data.Categories {
+		categoryMap[cat.Name] = cat.Count
+	}
+	if categoryMap["图片"] != 1 {
+		t.Errorf("expected 1 image category, got %d", categoryMap["图片"])
+	}
+	if categoryMap["视频"] != 1 {
+		t.Errorf("expected 1 video category, got %d", categoryMap["视频"])
+	}
+	if categoryMap["文档"] != 1 {
+		t.Errorf("expected 1 document category, got %d", categoryMap["文档"])
 	}
 }

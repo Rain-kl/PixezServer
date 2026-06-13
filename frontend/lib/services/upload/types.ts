@@ -61,3 +61,32 @@ export interface ListUploadsResponse {
   page_size: number
   items: Upload[]
 }
+
+/**
+ * 近 7 天新增文件趋势项
+ */
+export interface TrendItem {
+  date: string
+  count: number
+  size: number
+}
+
+/**
+ * 文件分类/类型统计项
+ */
+export interface DistributionItem {
+  name: string
+  count: number
+  size: number
+}
+
+/**
+ * 文件统计信息响应
+ */
+export interface FileStatsResponse {
+  total_count: number
+  total_size: number
+  trend: TrendItem[]
+  categories: DistributionItem[]
+  types: DistributionItem[]
+}

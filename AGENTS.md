@@ -27,6 +27,7 @@
 - `database-migration`：在数据库升级流程时使用。
 - Go skills：使用针对性的 `go-*` skills 来获取 Go 实现细节，如测试、错误处理、包、Context、并发、日志、文档和审查。
 - `shadcn`：在添加、修改或组合 shadcn/ui 组件时使用。
+- `code-review-skill`：在提交 PR 之前使用，检查代码质量、样式、潜在错误和最佳实践。
 
 ## 严格遵循事项 (Guardrails)
 
